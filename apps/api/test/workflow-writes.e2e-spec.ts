@@ -275,6 +275,109 @@ describe('Workflow writes (db)', () => {
     expect(airportPanadol.reservedQuantity).toBe(0);
   });
 
+  it('assigns delivery and advances a ready order through in-transit to delivered', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const checkoutResponse = await request(app.getHttpServer())
+      .post('/api/v1/orders/checkout')
+      .set(headers)
+      .send({
+        customerId: 'cust-101',
+        branchId: 'branch-airport',
+        items: [
+          {
+            productId: 'prod-panadol-extra',
+            quantity: 1,
+          },
+        ],
+      })
+      .expect(201);
+
+    const paymentAttemptResponse = await request(app.getHttpServer())
+      .post('/api/v1/payments/attempts')
+      .set(headers)
+      .send({
+        orderId: checkoutResponse.body.order.id,
+        provider: 'paystack',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/payments/webhooks')
+      .send({
+        provider: 'paystack',
+        providerReference: paymentAttemptResponse.body.paymentAttempt.providerReference,
+        status: 'captured',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/orders/${checkoutResponse.body.order.id}/status`)
+      .set(headers)
+      .send({ status: 'ready_for_dispatch' })
+      .expect(200);
+
+    const assignResponse = await request(app.getHttpServer())
+      .post('/api/v1/delivery/jobs')
+      .set(headers)
+      .send({
+        orderId: checkoutResponse.body.order.id,
+        dispatchMode: 'courier_dispatch',
+        assignedTo: 'rider-001',
+        trackingReference: 'WAYBILL-001',
+      })
+      .expect(201);
+
+    expect(assignResponse.body.deliveryJob.status).toBe('assigned');
+    expect(assignResponse.body.deliveryJob.dispatchMode).toBe('courier_dispatch');
+    expect(assignResponse.body.order.status).toBe('ready_for_dispatch');
+
+    const transitResponse = await request(app.getHttpServer())
+      .patch(`/api/v1/delivery/jobs/${assignResponse.body.deliveryJob.id}/status`)
+      .set(headers)
+      .send({ status: 'in_transit' })
+      .expect(200);
+
+    expect(transitResponse.body.deliveryJob.status).toBe('in_transit');
+    expect(transitResponse.body.order.status).toBe('in_transit');
+
+    const deliveredResponse = await request(app.getHttpServer())
+      .patch(`/api/v1/delivery/jobs/${assignResponse.body.deliveryJob.id}/status`)
+      .set(headers)
+      .send({ status: 'delivered' })
+      .expect(200);
+
+    expect(deliveredResponse.body.deliveryJob.status).toBe('delivered');
+    expect(deliveredResponse.body.order.status).toBe('delivered');
+
+    const savedDeliveryJob = await prisma.deliveryJob.findUniqueOrThrow({
+      where: {
+        id: assignResponse.body.deliveryJob.id,
+      },
+    });
+
+    expect(savedDeliveryJob.assignedTo).toBe('rider-001');
+    expect(savedDeliveryJob.status).toBe('delivered');
+
+    const savedOrder = await prisma.pharmacyOrder.findUniqueOrThrow({
+      where: {
+        id: checkoutResponse.body.order.id,
+      },
+    });
+
+    expect(savedOrder.status).toBe('delivered');
+  });
+
   it('rejects a prescription and cancels the linked order', async () => {
     const loginResponse = await request(app.getHttpServer())
       .post('/api/v1/auth/login')

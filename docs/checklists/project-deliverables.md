@@ -69,7 +69,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [ ] Add prescription submission, review, approval, and fulfillment state transitions.
 - [ ] Add inventory reservation, stock adjustment, and low-stock alert workflows.
 - [x] Add payment attempt creation, capture, failure handling, and reconciliation workflows.
-- [ ] Add delivery assignment and delivery-status transition workflows.
+- [x] Add delivery assignment and delivery-status transition workflows.
 
 ### Background Processing And Operations
 

@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 
 export async function seedDatabase(prisma: PrismaClient) {
+  await prisma.deliveryJob.deleteMany();
   await prisma.inventoryReservation.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.paymentAttempt.deleteMany();

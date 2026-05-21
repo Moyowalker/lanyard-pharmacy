@@ -23,7 +23,7 @@
 - Order items and inventory reservations are now persisted in PostgreSQL and used by the write-side workflow services.
 - Orders now expose cart preview and checkout flows that persist `order_items` and derive initial order state from the cart contents.
 - Payment attempts now persist in PostgreSQL and webhook reconciliation updates linked order workflow state and inventory reservations.
-- Delivery still exposes scaffolded read surfaces and should move to persisted aggregates next.
+- Delivery jobs now persist in PostgreSQL and drive assignment plus delivery-status transitions against linked orders.
 
 ## Current Exposed Endpoints
 
@@ -44,6 +44,8 @@
 - `POST /api/v1/payments/attempts`
 - `POST /api/v1/payments/webhooks`
 - `GET /api/v1/delivery/dispatch-modes`
+- `POST /api/v1/delivery/jobs`
+- `PATCH /api/v1/delivery/jobs/:deliveryJobId/status`
 - `GET /api/docs`
 
 ## Local Database Workflow
@@ -61,8 +63,8 @@ GitHub Actions now runs the DB-backed workflow suite against a disposable Postgr
 
 ## Next Persistence Step
 
-- Persist delivery jobs and audit events in PostgreSQL.
-- Add branch-scoped write use cases for customer management, stock adjustments, and delivery assignment.
+- Persist audit events in PostgreSQL.
+- Add branch-scoped write use cases for customer management and stock adjustments.
 - Broaden CI coverage from the DB-backed workflow suite to the wider API verification matrix.
 
 ## Worker Modules
