@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# build outputs
+.next/
+dist/
+coverage/
+.turbo/
+
+# environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# operating system
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# uploads and generated assets
+tmp/
+uploads/

@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lanyard-pharmacy-postgres
+    environment:
+      POSTGRES_DB: lanyard_pharmacy
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - lanyard-pharmacy-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lanyard_pharmacy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  lanyard-pharmacy-postgres:

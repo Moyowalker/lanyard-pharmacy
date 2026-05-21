@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  draft
+  pending_review
+  awaiting_payment
+  processing
+  ready_for_dispatch
+  in_transit
+  delivered
+  cancelled
+}
+
+enum PrescriptionStatus {
+  submitted
+  under_review
+  approved
+  rejected
+  clarification_requested
+}
+
+enum PaymentProvider {
+  paystack
+  flutterwave
+}
+
+enum PaymentAttemptStatus {
+  initiated
+  authorized
+  captured
+  failed
+  refunded
+}
+
+model Branch {
+  id               String           @id @db.VarChar(64)
+  name             String
+  city             String
+  supportsDelivery Boolean          @default(true)
+  branchProducts   BranchProduct[]
+  inventoryBatches InventoryBatch[]
+  pharmacyOrders   PharmacyOrder[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@map("branches")
+}
+
+model Customer {
+  id                 String          @id @db.VarChar(64)
+  firstName          String
+  lastName           String
+  email              String          @unique
+  phone              String          @unique
+  refillReminderOptIn Boolean        @default(false)
+  pharmacyOrders     PharmacyOrder[]
+  prescriptions      Prescription[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@map("customers")
+}
+
+model Product {
+  id                   String           @id @db.VarChar(64)
+  name                 String
+  slug                 String           @unique
+  requiresPrescription Boolean          @default(false)
+  category             String
+  dosageForm           String
+  price                Int
+  branchProducts       BranchProduct[]
+  inventoryBatches     InventoryBatch[]
+  orderItems           OrderItem[]
+  inventoryReservations InventoryReservation[]
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  @@map("products")
+}
+
+model BranchProduct {
+  branchId  String   @db.VarChar(64)
+  productId String   @db.VarChar(64)
+  createdAt DateTime @default(now())
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([branchId, productId])
+  @@index([productId])
+  @@map("branch_products")
+}
+
+model InventoryBatch {
+  id                String   @id @db.VarChar(64)
+  branchId          String   @db.VarChar(64)
+  productId         String   @db.VarChar(64)
+  availableQuantity Int
+  reservedQuantity  Int      @default(0)
+  batchCode         String
+  expiryDate        DateTime @db.Date
+  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reservations      InventoryReservation[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([branchId, batchCode])
+  @@index([branchId, productId])
+  @@map("inventory_batches")
+}
+
+model PharmacyOrder {
+  id                        String           @id @db.VarChar(64)
+  customerId                String           @db.VarChar(64)
+  branchId                  String           @db.VarChar(64)
+  status                    OrderStatus
+  total                     Int
+  containsPrescriptionItems Boolean          @default(false)
+  customer                  Customer         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  branch                    Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  items                     OrderItem[]
+  inventoryReservations     InventoryReservation[]
+  prescriptions             Prescription[]
+  paymentAttempts           PaymentAttempt[]
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+
+  @@index([customerId])
+  @@index([branchId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String        @id @db.VarChar(64)
+  orderId    String        @db.VarChar(64)
+  productId  String        @db.VarChar(64)
+  quantity   Int
+  unitPrice  Int
+  order      PharmacyOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product    Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
+  @@unique([orderId, productId])
+  @@map("order_items")
+}
+
+model InventoryReservation {
+  id               String         @id @db.VarChar(64)
+  orderId          String         @db.VarChar(64)
+  inventoryBatchId String         @db.VarChar(64)
+  productId        String         @db.VarChar(64)
+  quantity         Int
+  order            PharmacyOrder  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  inventoryBatch   InventoryBatch @relation(fields: [inventoryBatchId], references: [id], onDelete: Cascade)
+  product          Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([orderId])
+  @@index([inventoryBatchId])
+  @@index([productId])
+  @@unique([orderId, inventoryBatchId, productId])
+  @@map("inventory_reservations")
+}
+
+model Prescription {
+  id         String             @id @db.VarChar(64)
+  customerId String             @db.VarChar(64)
+  orderId    String?            @db.VarChar(64)
+  status     PrescriptionStatus
+  reviewedBy String?            @db.VarChar(64)
+  uploadedAt DateTime
+  customer   Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  order      PharmacyOrder?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([customerId])
+  @@index([orderId])
+  @@map("prescriptions")
+}
+
+model PaymentAttempt {
+  id                String               @id @db.VarChar(64)
+  orderId           String               @db.VarChar(64)
+  provider          PaymentProvider
+  status            PaymentAttemptStatus
+  providerReference String               @unique
+  amount            Int
+  currency          String               @default("NGN")
+  order             PharmacyOrder        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([orderId])
+  @@map("payment_attempts")
+}
