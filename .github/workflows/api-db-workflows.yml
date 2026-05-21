@@ -1,0 +1,57 @@
+name: API DB Workflows
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  api-db-workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: lanyard_pharmacy
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lanyard_pharmacy"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lanyard_pharmacy?schema=public
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter @lanyard/api db:generate
+
+      - name: Apply Prisma migrations
+        run: pnpm --filter @lanyard/api db:deploy
+
+      - name: Seed PostgreSQL
+        run: pnpm --filter @lanyard/api db:seed
+
+      - name: Run DB-backed API workflows
+        run: pnpm --filter @lanyard/api test:e2e:db

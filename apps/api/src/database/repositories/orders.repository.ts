@@ -34,6 +34,21 @@ export type OrderDetailRecord = OrderRecord & {
   inventoryReservations: OrderReservationRecord[];
 };
 
+export type CreateOrderInput = {
+  id: string;
+  customerId: string;
+  branchId: string;
+  status: OrderStatus;
+  total: number;
+  containsPrescriptionItems: boolean;
+  items: Array<{
+    id: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+};
+
 type OrderWithRelations = Prisma.PharmacyOrderGetPayload<{
   include: {
     items: true;
@@ -44,6 +59,41 @@ type OrderWithRelations = Prisma.PharmacyOrderGetPayload<{
 @Injectable()
 export class OrdersRepository {
   constructor(private readonly database: DatabaseService) {}
+
+  async create(input: CreateOrderInput, client?: Prisma.TransactionClient): Promise<OrderDetailRecord> {
+    const order = await this.executor(client).pharmacyOrder.create({
+      data: {
+        id: input.id,
+        customerId: input.customerId,
+        branchId: input.branchId,
+        status: input.status,
+        total: input.total,
+        containsPrescriptionItems: input.containsPrescriptionItems,
+        items: {
+          create: input.items.map((item) => ({
+            id: item.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          })),
+        },
+      },
+      include: {
+        items: {
+          orderBy: {
+            id: 'asc',
+          },
+        },
+        inventoryReservations: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    });
+
+    return this.mapOrder(order);
+  }
 
   async findById(orderId: string, client?: Prisma.TransactionClient): Promise<OrderDetailRecord | null> {
     const order = await this.executor(client).pharmacyOrder.findUnique({

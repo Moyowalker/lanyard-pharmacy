@@ -29,9 +29,55 @@ export type InventoryReservationRequest = {
   }>;
 };
 
+export type BranchProductAvailabilityRecord = {
+  productId: string;
+  availableQuantity: number;
+  reservedQuantity: number;
+};
+
 @Injectable()
 export class InventoryRepository {
   constructor(private readonly database: DatabaseService) {}
+
+  async getAvailabilityForProducts(
+    branchId: string,
+    productIds: string[],
+    client?: Prisma.TransactionClient,
+  ): Promise<BranchProductAvailabilityRecord[]> {
+    if (!productIds.length) {
+      return [];
+    }
+
+    const inventory = await this.executor(client).inventoryBatch.findMany({
+      where: {
+        branchId,
+        productId: {
+          in: [...new Set(productIds)],
+        },
+      },
+      select: {
+        productId: true,
+        availableQuantity: true,
+        reservedQuantity: true,
+      },
+    });
+
+    const totals = new Map<string, BranchProductAvailabilityRecord>();
+
+    for (const batch of inventory) {
+      const current = totals.get(batch.productId) ?? {
+        productId: batch.productId,
+        availableQuantity: 0,
+        reservedQuantity: 0,
+      };
+
+      current.availableQuantity += batch.availableQuantity;
+      current.reservedQuantity += batch.reservedQuantity;
+      totals.set(batch.productId, current);
+    }
+
+    return [...totals.values()];
+  }
 
   async findByBranch(branchId: string): Promise<InventoryBatchRecord[]> {
     const inventory = await this.database.inventoryBatch.findMany({

@@ -65,10 +65,10 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Add pharmacist prescription review action workflow with approval, rejection, and clarification transitions.
 - [x] Add PostgreSQL-backed order item and reservation persistence for fulfillment workflows.
 - [ ] Add customer create and update workflows with validation and conflict handling.
-- [ ] Add cart, checkout, and order creation workflows.
+- [x] Add cart, checkout, and order creation workflows.
 - [ ] Add prescription submission, review, approval, and fulfillment state transitions.
 - [ ] Add inventory reservation, stock adjustment, and low-stock alert workflows.
-- [ ] Add payment attempt creation, capture, failure handling, and reconciliation workflows.
+- [x] Add payment attempt creation, capture, failure handling, and reconciliation workflows.
 - [ ] Add delivery assignment and delivery-status transition workflows.
 
 ### Background Processing And Operations
@@ -81,6 +81,8 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 
 ### Contracts, Quality, And Release Readiness
 
+- [x] Add GitHub Actions CI coverage for targeted web, admin, API, and worker validation on pushes and pull requests.
+- [x] Add CI automation that boots disposable PostgreSQL and runs DB-backed API workflow coverage.
 - [ ] Populate `packages/api-contracts` with shared types or contracts consumed by the frontend apps.
 - [ ] Add targeted end-to-end coverage for auth, branch scoping, orders, prescriptions, payments, and delivery.
 - [ ] Add deployment and environment runbooks for `apps/web`, `apps/admin`, `apps/api`, and `apps/worker`.

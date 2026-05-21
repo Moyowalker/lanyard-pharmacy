@@ -77,6 +77,204 @@ describe('Workflow writes (db)', () => {
     expect(mainAmoxicillin.reservedQuantity).toBe(1);
   });
 
+  it('previews a cart and creates an order with persisted line items', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const body = {
+      customerId: 'cust-100',
+      branchId: 'branch-main',
+      items: [
+        {
+          productId: 'prod-panadol-extra',
+          quantity: 2,
+        },
+        {
+          productId: 'prod-amoxicillin-500',
+          quantity: 1,
+        },
+      ],
+    };
+
+    const previewResponse = await request(app.getHttpServer())
+      .post('/api/v1/orders/cart/preview')
+      .set(headers)
+      .send(body)
+      .expect(201);
+
+    expect(previewResponse.body.total).toBe(17200);
+    expect(previewResponse.body.containsPrescriptionItems).toBe(true);
+    expect(previewResponse.body.nextOrderStatus).toBe('pending_review');
+    expect(previewResponse.body.items).toHaveLength(2);
+
+    const checkoutResponse = await request(app.getHttpServer())
+      .post('/api/v1/orders/checkout')
+      .set(headers)
+      .send(body)
+      .expect(201);
+
+    expect(checkoutResponse.body.order.status).toBe('pending_review');
+    expect(checkoutResponse.body.order.total).toBe(17200);
+    expect(checkoutResponse.body.order.containsPrescriptionItems).toBe(true);
+    expect(checkoutResponse.body.order.items).toHaveLength(2);
+
+    const savedItems = await prisma.orderItem.findMany({
+      where: {
+        orderId: checkoutResponse.body.order.id,
+      },
+      orderBy: {
+        id: 'asc',
+      },
+    });
+
+    expect(savedItems).toHaveLength(2);
+    expect(savedItems.map((item) => ({ productId: item.productId, quantity: item.quantity, unitPrice: item.unitPrice })))
+      .toEqual([
+        {
+          productId: 'prod-panadol-extra',
+          quantity: 2,
+          unitPrice: 4500,
+        },
+        {
+          productId: 'prod-amoxicillin-500',
+          quantity: 1,
+          unitPrice: 8200,
+        },
+      ]);
+  });
+
+  it('creates payment attempts, handles failed retries, and reconciles captured payments into processing', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const checkoutResponse = await request(app.getHttpServer())
+      .post('/api/v1/orders/checkout')
+      .set(headers)
+      .send({
+        customerId: 'cust-101',
+        branchId: 'branch-airport',
+        items: [
+          {
+            productId: 'prod-panadol-extra',
+            quantity: 2,
+          },
+        ],
+      })
+      .expect(201);
+
+    expect(checkoutResponse.body.order.status).toBe('awaiting_payment');
+
+    const failedAttemptResponse = await request(app.getHttpServer())
+      .post('/api/v1/payments/attempts')
+      .set(headers)
+      .send({
+        orderId: checkoutResponse.body.order.id,
+        provider: 'paystack',
+      })
+      .expect(201);
+
+    expect(failedAttemptResponse.body.paymentAttempt.status).toBe('initiated');
+    expect(failedAttemptResponse.body.paymentAttempt.amount).toBe(9000);
+
+    const failedWebhookResponse = await request(app.getHttpServer())
+      .post('/api/v1/payments/webhooks')
+      .send({
+        provider: 'paystack',
+        providerReference: failedAttemptResponse.body.paymentAttempt.providerReference,
+        status: 'failed',
+      })
+      .expect(201);
+
+    expect(failedWebhookResponse.body.paymentAttempt.status).toBe('failed');
+    expect(failedWebhookResponse.body.order.status).toBe('awaiting_payment');
+    expect(failedWebhookResponse.body.inventoryReservations).toHaveLength(0);
+
+    const capturedAttemptResponse = await request(app.getHttpServer())
+      .post('/api/v1/payments/attempts')
+      .set(headers)
+      .send({
+        orderId: checkoutResponse.body.order.id,
+        provider: 'flutterwave',
+      })
+      .expect(201);
+
+    const capturedWebhookResponse = await request(app.getHttpServer())
+      .post('/api/v1/payments/webhooks')
+      .send({
+        provider: 'flutterwave',
+        providerReference: capturedAttemptResponse.body.paymentAttempt.providerReference,
+        status: 'captured',
+      })
+      .expect(201);
+
+    expect(capturedWebhookResponse.body.paymentAttempt.status).toBe('captured');
+    expect(capturedWebhookResponse.body.order.status).toBe('processing');
+    expect(capturedWebhookResponse.body.inventoryReservations).toHaveLength(1);
+
+    const savedAttempt = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: {
+        id: capturedAttemptResponse.body.paymentAttempt.id,
+      },
+    });
+
+    expect(savedAttempt.status).toBe('captured');
+
+    const airportPanadol = await prisma.inventoryBatch.findUniqueOrThrow({
+      where: { id: 'inv-pan-ex-airport' },
+    });
+
+    expect(airportPanadol.availableQuantity).toBe(17);
+    expect(airportPanadol.reservedQuantity).toBe(3);
+  });
+
+  it('reconciles refund webhooks and cancels the linked order', async () => {
+    const refundResponse = await request(app.getHttpServer())
+      .post('/api/v1/payments/webhooks')
+      .send({
+        provider: 'paystack',
+        providerReference: 'PSTK-1002',
+        status: 'refunded',
+      })
+      .expect(201);
+
+    expect(refundResponse.body.paymentAttempt.status).toBe('refunded');
+    expect(refundResponse.body.order.status).toBe('cancelled');
+    expect(refundResponse.body.inventoryReservations).toHaveLength(0);
+
+    const savedAttempt = await prisma.paymentAttempt.findUniqueOrThrow({
+      where: {
+        id: 'pay-1002',
+      },
+    });
+
+    expect(savedAttempt.status).toBe('refunded');
+
+    const airportPanadol = await prisma.inventoryBatch.findUniqueOrThrow({
+      where: { id: 'inv-pan-ex-airport' },
+    });
+
+    expect(airportPanadol.availableQuantity).toBe(20);
+    expect(airportPanadol.reservedQuantity).toBe(0);
+  });
+
   it('rejects a prescription and cancels the linked order', async () => {
     const loginResponse = await request(app.getHttpServer())
       .post('/api/v1/auth/login')

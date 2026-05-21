@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import { JwtAuthGuard } from '../../common/auth/jwt-auth.guard';
 import { RolesGuard } from '../../common/auth/roles.guard';
 import { Roles } from '../../common/auth/roles.decorator';
 import type { AuthenticatedUser } from '../identity/interfaces/authenticated-user.interface';
+import { CheckoutOrderDto, PreviewCartDto } from './dto/checkout-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { OrdersService } from './orders.service';
 
@@ -11,6 +12,18 @@ import { OrdersService } from './orders.service';
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @Roles('customer', 'pharmacist', 'branch_manager', 'support_admin', 'super_admin')
+  @Post('cart/preview')
+  previewCart(@Body() body: PreviewCartDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.ordersService.previewCart(body, actor);
+  }
+
+  @Roles('customer', 'pharmacist', 'branch_manager', 'support_admin', 'super_admin')
+  @Post('checkout')
+  checkout(@Body() body: CheckoutOrderDto, @CurrentUser() actor: AuthenticatedUser) {
+    return this.ordersService.checkout(body, actor);
+  }
 
   @Roles('pharmacist', 'branch_manager', 'dispatcher', 'support_admin', 'super_admin')
   @Get()

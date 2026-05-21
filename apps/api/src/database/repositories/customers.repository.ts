@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { DatabaseService } from '../database.service';
 
 export type CustomerRecord = {
@@ -14,6 +15,22 @@ export type CustomerRecord = {
 export class CustomersRepository {
   constructor(private readonly database: DatabaseService) {}
 
+  async findById(customerId: string, client?: Prisma.TransactionClient): Promise<CustomerRecord | null> {
+    const customer = await this.executor(client).customer.findUnique({
+      where: { id: customerId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        refillReminderOptIn: true,
+      },
+    });
+
+    return customer;
+  }
+
   async list(): Promise<CustomerRecord[]> {
     return this.database.customer.findMany({
       select: {
@@ -26,5 +43,9 @@ export class CustomersRepository {
       },
       orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
+  }
+
+  private executor(client?: Prisma.TransactionClient) {
+    return client ?? this.database;
   }
 }
