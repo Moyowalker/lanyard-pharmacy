@@ -23,7 +23,17 @@ describe('Health (e2e)', () => {
     return request(app.getHttpServer())
       .get('/api/v1/health')
       .expect(200)
-      .expect({ service: 'api', status: 'ok' });
+      .expect((response) => {
+        expect(response.body).toMatchObject({
+          service: 'api',
+          status: 'ok',
+          metrics: {
+            healthChecksTotal: 1,
+            deadLetterCount: 0,
+          },
+          alerts: [],
+        });
+      });
   });
 
   afterEach(async () => {

@@ -55,8 +55,10 @@ enum DeliveryStatus {
 enum WorkflowEventStatus {
   pending
   processing
+  retrying
   completed
   failed
+  dead_lettered
 }
 
 enum NotificationChannel {
@@ -281,14 +283,18 @@ model WorkflowEvent {
   entityId             String                       @db.VarChar(128)
   status               WorkflowEventStatus         @default(pending)
   attempts             Int                          @default(0)
+  maxAttempts          Int                          @default(3)
   payload              Json
   errorMessage         String?                      @db.VarChar(512)
   notificationAttempts NotificationDeliveryAttempt[]
+  availableAt          DateTime                     @default(now())
   createdAt            DateTime                     @default(now())
   updatedAt            DateTime                     @updatedAt
+  lastAttemptedAt      DateTime?
   processedAt          DateTime?
+  deadLetteredAt       DateTime?
 
-  @@index([status, createdAt])
+  @@index([status, availableAt, createdAt])
   @@index([entityType, entityId])
   @@map("workflow_events")
 }

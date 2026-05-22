@@ -21,6 +21,7 @@ export class WorkflowEventsRepository {
         eventType: input.eventType,
         entityType: input.entityType,
         entityId: input.entityId,
+        maxAttempts: this.resolveMaxAttempts(),
         payload: input.payload ?? {},
       },
     });
@@ -28,5 +29,15 @@ export class WorkflowEventsRepository {
 
   private executor(client?: Prisma.TransactionClient) {
     return client ?? this.database;
+  }
+
+  private resolveMaxAttempts() {
+    const value = Number.parseInt(process.env.WORKFLOW_EVENT_MAX_ATTEMPTS ?? '3', 10);
+
+    if (!Number.isFinite(value) || value < 1) {
+      return 3;
+    }
+
+    return value;
   }
 }

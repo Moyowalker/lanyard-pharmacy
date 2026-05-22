@@ -10,6 +10,7 @@ import { HealthModule } from '../health/health.module';
 import { IdentityModule } from '../identity/identity.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ObservabilityModule } from '../observability/observability.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { PrescriptionsModule } from '../prescriptions/prescriptions.module';
@@ -25,6 +26,7 @@ import { validateEnv } from '../../config/env.validation';
       validate: validateEnv,
     }),
     DatabaseModule,
+    ObservabilityModule,
     HealthModule,
     IdentityModule,
     CustomersModule,

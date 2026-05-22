@@ -19,13 +19,17 @@ export type WorkflowEventRecord = {
   eventType: string;
   entityType: string;
   entityId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'processing' | 'retrying' | 'completed' | 'failed' | 'dead_lettered';
   attempts: number;
+  maxAttempts: number;
   payload: WorkflowEventPayload;
   errorMessage: string | null;
+  availableAt: string;
   createdAt: string;
   updatedAt: string;
+  lastAttemptedAt: string | null;
   processedAt: string | null;
+  deadLetteredAt: string | null;
 };
 
 @Injectable()
@@ -35,10 +39,15 @@ export class WorkflowEventsRepository {
   async listPending(limit = 50, client?: Prisma.TransactionClient): Promise<WorkflowEventRecord[]> {
     const events = await this.executor(client).workflowEvent.findMany({
       where: {
-        status: 'pending',
+        status: {
+          in: ['pending', 'retrying'],
+        },
+        availableAt: {
+          lte: new Date(),
+        },
       },
       orderBy: {
-        createdAt: 'asc',
+        availableAt: 'asc',
       },
       take: limit,
     });
@@ -55,6 +64,7 @@ export class WorkflowEventsRepository {
           increment: 1,
         },
         errorMessage: null,
+        lastAttemptedAt: new Date(),
       },
     });
 
@@ -77,13 +87,22 @@ export class WorkflowEventsRepository {
   async markFailed(
     eventId: string,
     errorMessage: string,
+    retryDelaySeconds: number,
     client?: Prisma.TransactionClient,
   ): Promise<WorkflowEventRecord> {
+    const currentEvent = await this.executor(client).workflowEvent.findUniqueOrThrow({
+      where: { id: eventId },
+    });
+    const shouldDeadLetter = currentEvent.attempts >= currentEvent.maxAttempts;
+    const retryAt = new Date(Date.now() + Math.max(0, retryDelaySeconds) * 1000);
     const event = await this.executor(client).workflowEvent.update({
       where: { id: eventId },
       data: {
-        status: 'failed',
+        status: shouldDeadLetter ? 'dead_lettered' : 'retrying',
         errorMessage: errorMessage.slice(0, 512),
+        availableAt: shouldDeadLetter ? new Date() : retryAt,
+        deadLetteredAt: shouldDeadLetter ? new Date() : null,
+        processedAt: shouldDeadLetter ? new Date() : null,
       },
     });
 
@@ -99,13 +118,17 @@ export class WorkflowEventsRepository {
     eventType: string;
     entityType: string;
     entityId: string;
-    status: 'pending' | 'processing' | 'completed' | 'failed';
+    status: WorkflowEventRecord['status'];
     attempts: number;
+    maxAttempts: number;
     payload: Prisma.JsonValue;
     errorMessage: string | null;
+    availableAt: Date;
     createdAt: Date;
     updatedAt: Date;
+    lastAttemptedAt: Date | null;
     processedAt: Date | null;
+    deadLetteredAt: Date | null;
   }): WorkflowEventRecord {
     return {
       id: event.id,
@@ -114,11 +137,15 @@ export class WorkflowEventsRepository {
       entityId: event.entityId,
       status: event.status,
       attempts: event.attempts,
+      maxAttempts: event.maxAttempts,
       payload: this.mapPayload(event.payload),
       errorMessage: event.errorMessage,
+      availableAt: event.availableAt.toISOString(),
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
+      lastAttemptedAt: event.lastAttemptedAt?.toISOString() ?? null,
       processedAt: event.processedAt?.toISOString() ?? null,
+      deadLetteredAt: event.deadLetteredAt?.toISOString() ?? null,
     };
   }
 

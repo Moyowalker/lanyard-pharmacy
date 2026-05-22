@@ -29,6 +29,8 @@
 - Delivery jobs now persist in PostgreSQL and drive assignment plus delivery-status transitions against linked orders.
 - API-side customer, inventory, order, payment, prescription, and delivery mutations now emit persisted audit events in PostgreSQL.
 - API-side order, payment, inventory, and prescription mutations now also emit persisted workflow events, and worker modules drain those events into notification delivery attempts plus worker-side audit trails.
+- Workflow events now support configurable max-attempt policies, retry scheduling, and durable dead-letter states for failed worker processing.
+- API and worker health endpoints now expose structured operational metrics plus retry/dead-letter alerts backed by the shared workflow event store.
 
 ## Current Exposed Endpoints
 
@@ -75,11 +77,13 @@ GitHub Actions now runs the DB-backed workflow suite against a disposable Postgr
 
 Worker-side event processing is validated with `pnpm --filter @lanyard/worker test:e2e` against the same PostgreSQL database used by the API app.
 
+Shared platform health and workflow-status contracts now live in `packages/api-contracts` and are consumed by the placeholder web and admin apps.
+
 ## Next Persistence Step
 
-- Add durable queue configuration, retry policies, and dead-letter handling for worker job processing.
 - Broaden CI coverage from the DB-backed workflow suite to the wider API verification matrix.
-- Add structured logging, metrics, and alertable failure monitoring for API and worker processes.
+- Add deployment and environment runbooks for `apps/web`, `apps/admin`, `apps/api`, and `apps/worker`.
+- Add release-readiness documentation for operational rollback, seeding, and smoke checks.
 
 ## Worker Modules
 

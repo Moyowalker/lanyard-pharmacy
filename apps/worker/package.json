@@ -21,6 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@lanyard/api-contracts": "workspace:*",
     "@prisma/client": "^6.8.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",

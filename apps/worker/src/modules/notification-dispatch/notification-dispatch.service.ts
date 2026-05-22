@@ -3,6 +3,8 @@ import { Prisma } from '@prisma/client';
 import { NotificationDeliveryAttemptsRepository } from '../../database/repositories/notification-delivery-attempts.repository';
 import { type WorkflowEventPayload, type WorkflowEventRecord } from '../../database/repositories/workflow-events.repository';
 import { AuditService } from '../audit/audit.service';
+import { AppLogger } from '../observability/app-logger.service';
+import { OperationalMetricsService } from '../observability/operational-metrics.service';
 
 export type NotificationDispatchRequest = NonNullable<WorkflowEventPayload['notification']>;
 
@@ -11,6 +13,8 @@ export class NotificationDispatchService {
   constructor(
     private readonly notificationDeliveryAttemptsRepository: NotificationDeliveryAttemptsRepository,
     private readonly auditService: AuditService,
+    private readonly metrics: OperationalMetricsService,
+    private readonly logger: AppLogger,
   ) {}
 
   async dispatch(
@@ -45,6 +49,14 @@ export class NotificationDispatchService {
       },
       client,
     );
+
+    this.metrics.recordNotificationDispatch();
+    this.logger.logEvent('log', 'notification-dispatch', 'notification_dispatched', {
+      workflowEventId: event.id,
+      notificationAttemptId: attempt.id,
+      template: notification.template,
+      channel: notification.channel,
+    });
 
     return attempt;
   }

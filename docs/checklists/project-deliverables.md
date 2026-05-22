@@ -13,15 +13,15 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 
 - `apps/api` already contains scaffolded platform modules, health endpoints, auth and branch-aware access control, and several MVP read endpoints.
 - `apps/worker` already registers the main async workflow modules.
-- `apps/web` and `apps/admin` are still placeholder pages and should be treated as not started for product delivery.
+- `apps/web` and `apps/admin` now share foundational layout, state, and typed client scaffolding, but product-specific workflows are still not started.
 
 ## Frontend Deliverables
 
 ### Shared Frontend Foundation
 
-- [ ] Establish reusable UI primitives in `packages/ui` for forms, tables, status badges, dialogs, and navigation.
-- [ ] Define responsive layout patterns, design tokens, and shared loading, empty, error, and unauthorized states.
-- [ ] Add typed API client utilities and shared session or auth helpers for `apps/web` and `apps/admin`.
+- [x] Establish reusable UI primitives in `packages/ui` for forms, tables, status badges, dialogs, and navigation.
+- [x] Define responsive layout patterns, design tokens, and shared loading, empty, error, and unauthorized states.
+- [x] Add typed API client utilities and shared session or auth helpers for `apps/web` and `apps/admin`.
 - [ ] Define form validation, user feedback, and error-handling conventions across both frontend apps.
 
 ### Web Storefront MVP
@@ -74,17 +74,17 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 ### Background Processing And Operations
 
 - [x] Register worker modules for notification dispatch, prescription processing, inventory sync, and order events.
-- [ ] Add durable queue configuration, retry policies, and dead-letter handling for background jobs.
+- [x] Add durable queue configuration, retry policies, and dead-letter handling for background jobs.
 - [x] Persist API-side audit events for customer, order, payment, prescription, inventory, and delivery mutations.
 - [x] Persist notification delivery attempts and worker-side audit trails.
 - [x] Process order, payment, inventory, and prescription events end to end across API and worker.
-- [ ] Add structured logging, metrics, and alertable failure monitoring for API and worker processes.
+- [x] Add structured logging, metrics, and alertable failure monitoring for API and worker processes.
 
 ### Contracts, Quality, And Release Readiness
 
 - [x] Add GitHub Actions CI coverage for targeted web, admin, API, and worker validation on pushes and pull requests.
 - [x] Add CI automation that boots disposable PostgreSQL and runs DB-backed API workflow coverage.
-- [ ] Populate `packages/api-contracts` with shared types or contracts consumed by the frontend apps.
+- [x] Populate `packages/api-contracts` with shared types or contracts consumed by the frontend apps.
 - [x] Add targeted end-to-end coverage for auth, branch scoping, orders, prescriptions, payments, and delivery.
-- [ ] Add deployment and environment runbooks for `apps/web`, `apps/admin`, `apps/api`, and `apps/worker`.
-- [ ] Add release-readiness documentation for operational rollback, seeding, and smoke checks.
+- [x] Add deployment and environment runbooks for `apps/web`, `apps/admin`, `apps/api`, and `apps/worker`.
+- [x] Add release-readiness documentation for operational rollback, seeding, and smoke checks.

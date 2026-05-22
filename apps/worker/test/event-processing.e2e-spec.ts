@@ -13,12 +13,14 @@ describe('Worker event processing (e2e)', () => {
   let apiApp: INestApplication<SupertestApp>;
   let workerApp: INestApplication<SupertestApp>;
   let jobsService: JobsService;
+  const originalRetryDelay = process.env.WORKFLOW_EVENT_RETRY_DELAY_SECONDS;
 
   beforeAll(() => {
     prisma = new PrismaClient();
   });
 
   beforeEach(async () => {
+    process.env.WORKFLOW_EVENT_RETRY_DELAY_SECONDS = '0';
     await seedDatabase(prisma);
 
     const apiModuleFixture: TestingModule = await Test.createTestingModule({
@@ -48,6 +50,12 @@ describe('Worker event processing (e2e)', () => {
   afterEach(async () => {
     await apiApp.close();
     await workerApp.close();
+
+    if (originalRetryDelay === undefined) {
+      delete process.env.WORKFLOW_EVENT_RETRY_DELAY_SECONDS;
+    } else {
+      process.env.WORKFLOW_EVENT_RETRY_DELAY_SECONDS = originalRetryDelay;
+    }
   });
 
   afterAll(async () => {
@@ -156,5 +164,68 @@ describe('Worker event processing (e2e)', () => {
 
     expect(workerAuditEvents.some((event) => event.entityType === 'worker_job')).toBe(true);
     expect(workerAuditEvents.some((event) => event.entityType === 'notification')).toBe(true);
+  });
+
+  it('requeues failed workflow events and dead-letters them after the final attempt', async () => {
+    await prisma.workflowEvent.create({
+      data: {
+        id: 'evt-dead-letter-target',
+        eventType: 'order.created',
+        entityType: 'order',
+        entityId: 'ord-1001',
+        status: 'pending',
+        attempts: 0,
+        maxAttempts: 2,
+        payload: {
+          data: {
+            reason: 'missing notification metadata',
+          },
+        },
+      },
+    });
+
+    const firstDrain = await jobsService.drainPendingWorkflowEvents();
+
+    expect(firstDrain.processed).toBe(0);
+    expect(firstDrain.failed).toBe(1);
+    expect(firstDrain.retried).toBe(1);
+    expect(firstDrain.deadLettered).toBe(0);
+
+    const retriedEvent = await prisma.workflowEvent.findUniqueOrThrow({
+      where: { id: 'evt-dead-letter-target' },
+    });
+
+    expect(retriedEvent.status).toBe('retrying');
+    expect(retriedEvent.attempts).toBe(1);
+    expect(retriedEvent.errorMessage).toContain('missing notification metadata');
+    expect(retriedEvent.deadLetteredAt).toBeNull();
+
+    const secondDrain = await jobsService.drainPendingWorkflowEvents();
+
+    expect(secondDrain.processed).toBe(0);
+    expect(secondDrain.failed).toBe(1);
+    expect(secondDrain.retried).toBe(0);
+    expect(secondDrain.deadLettered).toBe(1);
+
+    const deadLetteredEvent = await prisma.workflowEvent.findUniqueOrThrow({
+      where: { id: 'evt-dead-letter-target' },
+    });
+
+    expect(deadLetteredEvent.status).toBe('dead_lettered');
+    expect(deadLetteredEvent.attempts).toBe(2);
+    expect(deadLetteredEvent.deadLetteredAt).not.toBeNull();
+
+    const workerAuditEvents = await prisma.auditEvent.findMany({
+      where: {
+        entityId: 'evt-dead-letter-target',
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    expect(workerAuditEvents.map((event) => event.action)).toEqual(
+      expect.arrayContaining(['processing_requeued', 'processing_dead_lettered']),
+    );
   });
 });

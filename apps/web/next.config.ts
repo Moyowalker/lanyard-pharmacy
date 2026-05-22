@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["@lanyard/api-contracts", "@lanyard/ui"],
 };
 
 export default nextConfig;
