@@ -8,6 +8,8 @@ describe('Worker health (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
+    process.env.SKIP_DB_CONNECT = 'true';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -25,5 +27,6 @@ describe('Worker health (e2e)', () => {
 
   afterEach(async () => {
     await app.close();
+    delete process.env.SKIP_DB_CONNECT;
   });
 });

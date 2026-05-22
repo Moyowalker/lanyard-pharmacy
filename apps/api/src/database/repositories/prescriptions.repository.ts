@@ -24,9 +24,37 @@ type PrescriptionWithOrder = Prisma.PrescriptionGetPayload<{
   };
 }>;
 
+export type CreatePrescriptionInput = {
+  id: string;
+  customerId: string;
+  orderId?: string | null;
+  status: PrescriptionStatus;
+  uploadedAt: Date;
+};
+
 @Injectable()
 export class PrescriptionsRepository {
   constructor(private readonly database: DatabaseService) {}
+
+  async create(
+    input: CreatePrescriptionInput,
+    client?: Prisma.TransactionClient,
+  ): Promise<PrescriptionDetailRecord> {
+    const prescription = await this.executor(client).prescription.create({
+      data: {
+        id: input.id,
+        customerId: input.customerId,
+        orderId: input.orderId ?? null,
+        status: input.status,
+        uploadedAt: input.uploadedAt,
+      },
+      include: {
+        order: true,
+      },
+    });
+
+    return this.mapPrescription(prescription);
+  }
 
   async findById(
     prescriptionId: string,
@@ -62,14 +90,14 @@ export class PrescriptionsRepository {
   async updateStatus(
     prescriptionId: string,
     status: PrescriptionStatus,
-    reviewedBy: string,
+    reviewedBy?: string,
     client?: Prisma.TransactionClient,
   ): Promise<PrescriptionDetailRecord> {
     const prescription = await this.executor(client).prescription.update({
       where: { id: prescriptionId },
       data: {
         status,
-        reviewedBy,
+        ...(reviewedBy !== undefined ? { reviewedBy } : {}),
       },
       include: {
         order: true,

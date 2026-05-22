@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module';
+import { AuditModule } from '../audit/audit.module';
 import { HealthModule } from '../health/health.module';
 import { InventorySyncModule } from '../inventory-sync/inventory-sync.module';
 import { JobsModule } from '../jobs/jobs.module';
@@ -8,6 +10,8 @@ import { PrescriptionProcessingModule } from '../prescription-processing/prescri
 
 @Module({
   imports: [
+    DatabaseModule,
+    AuditModule,
     HealthModule,
     JobsModule,
     NotificationDispatchModule,

@@ -34,12 +34,15 @@ pnpm --filter @lanyard/api db:generate
 pnpm --filter @lanyard/api db:deploy
 pnpm --filter @lanyard/api db:seed
 pnpm --filter @lanyard/api test:e2e:db
+pnpm --filter @lanyard/worker test:e2e
 pnpm --filter @lanyard/api db:studio
 ```
 
 Use `pnpm --filter @lanyard/api db:migrate` when you change the schema and need to create a new migration locally.
 
 The DB-backed workflow suite also runs in GitHub Actions via `.github/workflows/api-db-workflows.yml` against a disposable PostgreSQL service.
+
+The worker app now consumes DB-backed workflow events from the API runtime and persists notification delivery attempts plus worker audit trails into the same PostgreSQL database.
 
 ## Default Local Ports
 

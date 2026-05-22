@@ -10,6 +10,8 @@ import { DatabaseService } from '../../database/database.service';
 import { InventoryRepository } from '../../database/repositories/inventory.repository';
 import { OrdersRepository } from '../../database/repositories/orders.repository';
 import { PaymentAttemptsRepository } from '../../database/repositories/payment-attempts.repository';
+import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthenticatedUser } from '../identity/interfaces/authenticated-user.interface';
 import { OrdersWorkflow } from '../orders/orders.workflow';
 import { CreatePaymentAttemptDto } from './dto/create-payment-attempt.dto';
@@ -35,6 +37,8 @@ export class PaymentsService {
     private readonly inventoryRepository: InventoryRepository,
     private readonly ordersWorkflow: OrdersWorkflow,
     private readonly paymentsWorkflow: PaymentsWorkflow,
+    private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   getSupportedProviders() {
@@ -67,6 +71,44 @@ export class PaymentsService {
         client,
       );
 
+      await this.auditService.record(
+        {
+          actor,
+          entityType: 'payment',
+          entityId: paymentAttempt.id,
+          action: 'attempt_created',
+          payload: {
+            orderId: paymentAttempt.orderId,
+            provider: paymentAttempt.provider,
+            status: paymentAttempt.status,
+            providerReference: paymentAttempt.providerReference,
+            amount: paymentAttempt.amount,
+          },
+        },
+        client,
+      );
+
+      await this.notificationsService.queueWorkflowEvent(
+        {
+          eventType: 'payment.attempt_created',
+          entityType: 'payment',
+          entityId: paymentAttempt.id,
+          notification: {
+            channel: 'email',
+            recipient: 'billing@lanyardpharmacy.com',
+            template: 'payment-attempt-created',
+          },
+          data: {
+            orderId: paymentAttempt.orderId,
+            provider: paymentAttempt.provider,
+            status: paymentAttempt.status,
+            providerReference: paymentAttempt.providerReference,
+            amount: paymentAttempt.amount,
+          },
+        },
+        client,
+      );
+
       return {
         paymentAttempt,
         order,
@@ -90,6 +132,7 @@ export class PaymentsService {
       }
 
       let paymentAttempt = existingAttempt;
+      const previousPaymentStatus = existingAttempt.status;
       if (existingAttempt.status !== input.status) {
         this.paymentsWorkflow.requireTransition(existingAttempt.status, input.status);
         paymentAttempt = await this.paymentAttemptsRepository.updateStatus(existingAttempt.id, input.status, client);
@@ -100,8 +143,65 @@ export class PaymentsService {
         throw new NotFoundException(`Order ${existingAttempt.orderId} was not found`);
       }
 
+      const previousOrderStatus = order.status;
       order = await this.applyOrderEffects(order, input.status, client);
       const inventoryReservations = await this.inventoryRepository.listReservationsForOrder(order.id, client);
+
+      await this.auditService.record(
+        {
+          actor: { sub: 'system', email: 'system' },
+          entityType: 'payment',
+          entityId: paymentAttempt.id,
+          action: 'webhook_reconciled',
+          payload: {
+            provider: paymentAttempt.provider,
+            providerReference: paymentAttempt.providerReference,
+            from: previousPaymentStatus,
+            to: paymentAttempt.status,
+            orderId: paymentAttempt.orderId,
+          },
+        },
+        client,
+      );
+
+      if (previousOrderStatus !== order.status) {
+        await this.auditService.record(
+          {
+            actor: { sub: 'system', email: 'system' },
+            entityType: 'order',
+            entityId: order.id,
+            action: 'status_changed',
+            payload: {
+              from: previousOrderStatus,
+              to: order.status,
+              source: 'payment_webhook',
+            },
+          },
+          client,
+        );
+      }
+
+      await this.notificationsService.queueWorkflowEvent(
+        {
+          eventType: 'payment.webhook_reconciled',
+          entityType: 'payment',
+          entityId: paymentAttempt.id,
+          notification: {
+            channel: 'email',
+            recipient: 'billing@lanyardpharmacy.com',
+            template: 'payment-webhook-reconciled',
+          },
+          data: {
+            orderId: paymentAttempt.orderId,
+            provider: paymentAttempt.provider,
+            providerReference: paymentAttempt.providerReference,
+            from: previousPaymentStatus,
+            to: paymentAttempt.status,
+            orderStatus: order.status,
+          },
+        },
+        client,
+      );
 
       return {
         paymentAttempt,

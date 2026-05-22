@@ -12,6 +12,8 @@ import { CustomersRepository } from '../../database/repositories/customers.repos
 import { DatabaseService } from '../../database/database.service';
 import { InventoryRepository } from '../../database/repositories/inventory.repository';
 import { OrdersRepository } from '../../database/repositories/orders.repository';
+import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import type { AuthenticatedUser } from '../identity/interfaces/authenticated-user.interface';
 import { CheckoutOrderDto, PreviewCartDto } from './dto/checkout-order.dto';
 import type { OrderStatus } from './dto/order-status';
@@ -31,6 +33,7 @@ type CartSummaryItem = {
 
 type CartSummary = {
   customerId: string;
+  customerEmail: string;
   branchId: string;
   itemCount: number;
   total: number;
@@ -49,6 +52,8 @@ export class OrdersService {
     private readonly customersRepository: CustomersRepository,
     private readonly catalogRepository: CatalogRepository,
     private readonly ordersWorkflow: OrdersWorkflow,
+    private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   listOrders() {
@@ -78,6 +83,44 @@ export class OrdersService {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
           })),
+        },
+        client,
+      );
+
+      await this.auditService.record(
+        {
+          actor,
+          entityType: 'order',
+          entityId: order.id,
+          action: 'created',
+          payload: {
+            branchId: order.branchId,
+            customerId: order.customerId,
+            status: order.status,
+            total: order.total,
+            itemCount: order.items.length,
+          },
+        },
+        client,
+      );
+
+      await this.notificationsService.queueWorkflowEvent(
+        {
+          eventType: 'order.created',
+          entityType: 'order',
+          entityId: order.id,
+          notification: {
+            channel: 'email',
+            recipient: cart.customerEmail,
+            template: 'order-created',
+          },
+          data: {
+            branchId: order.branchId,
+            customerId: order.customerId,
+            status: order.status,
+            total: order.total,
+            containsPrescriptionItems: order.containsPrescriptionItems,
+          },
         },
         client,
       );
@@ -120,6 +163,42 @@ export class OrdersService {
 
       const updatedOrder = await this.ordersRepository.updateStatus(order.id, nextStatus, client);
       const reservations = await this.inventoryRepository.listReservationsForOrder(order.id, client);
+
+      await this.auditService.record(
+        {
+          actor,
+          entityType: 'order',
+          entityId: updatedOrder.id,
+          action: 'status_changed',
+          payload: {
+            from: order.status,
+            to: updatedOrder.status,
+            inventoryReservationCount: reservations.length,
+          },
+        },
+        client,
+      );
+
+      await this.notificationsService.queueWorkflowEvent(
+        {
+          eventType: 'order.status_changed',
+          entityType: 'order',
+          entityId: updatedOrder.id,
+          notification: {
+            channel: 'email',
+            recipient: 'support@lanyardpharmacy.com',
+            template: 'order-status-changed',
+          },
+          data: {
+            from: order.status,
+            to: updatedOrder.status,
+            branchId: updatedOrder.branchId,
+            customerId: updatedOrder.customerId,
+            inventoryReservationCount: reservations.length,
+          },
+        },
+        client,
+      );
 
       return {
         order: updatedOrder,
@@ -184,6 +263,7 @@ export class OrdersService {
 
     return {
       customerId: input.customerId,
+      customerEmail: customer.email,
       branchId: input.branchId,
       itemCount: items.reduce((total, item) => total + item.quantity, 0),
       total: items.reduce((total, item) => total + item.lineTotal, 0),

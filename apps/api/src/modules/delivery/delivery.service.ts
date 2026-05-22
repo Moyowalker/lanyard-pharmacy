@@ -12,6 +12,7 @@ import { DeliveryJobsRepository } from '../../database/repositories/delivery-job
 import { InventoryRepository } from '../../database/repositories/inventory.repository';
 import { OrdersRepository, type OrderDetailRecord } from '../../database/repositories/orders.repository';
 import { DatabaseService } from '../../database/database.service';
+import { AuditService } from '../audit/audit.service';
 import type { AuthenticatedUser } from '../identity/interfaces/authenticated-user.interface';
 import { OrdersWorkflow } from '../orders/orders.workflow';
 import { AssignDeliveryJobDto } from './dto/assign-delivery-job.dto';
@@ -29,6 +30,7 @@ export class DeliveryService {
     private readonly deliveryJobsRepository: DeliveryJobsRepository,
     private readonly ordersWorkflow: OrdersWorkflow,
     private readonly deliveryWorkflow: DeliveryWorkflow,
+    private readonly auditService: AuditService,
   ) {}
 
   getDispatchModes() {
@@ -68,6 +70,22 @@ export class DeliveryService {
         client,
       );
 
+      await this.auditService.record(
+        {
+          actor,
+          entityType: 'delivery',
+          entityId: deliveryJob.id,
+          action: 'assigned',
+          payload: {
+            orderId: deliveryJob.orderId,
+            dispatchMode: deliveryJob.dispatchMode,
+            assignedTo: deliveryJob.assignedTo,
+            trackingReference: deliveryJob.trackingReference,
+          },
+        },
+        client,
+      );
+
       return {
         deliveryJob,
         order,
@@ -91,8 +109,41 @@ export class DeliveryService {
       this.assertBranchScope(actor, order.branchId);
       this.deliveryWorkflow.requireTransition(deliveryJob.status, input.status);
 
+      const previousOrderStatus = order.status;
       const updatedDeliveryJob = await this.deliveryJobsRepository.updateStatus(deliveryJob.id, input.status, client);
       const updatedOrder = await this.applyOrderEffects(order, input.status, client);
+
+      await this.auditService.record(
+        {
+          actor,
+          entityType: 'delivery',
+          entityId: updatedDeliveryJob.id,
+          action: 'status_changed',
+          payload: {
+            from: deliveryJob.status,
+            to: updatedDeliveryJob.status,
+            orderId: updatedDeliveryJob.orderId,
+          },
+        },
+        client,
+      );
+
+      if (previousOrderStatus !== updatedOrder.status) {
+        await this.auditService.record(
+          {
+            actor,
+            entityType: 'order',
+            entityId: updatedOrder.id,
+            action: 'status_changed',
+            payload: {
+              from: previousOrderStatus,
+              to: updatedOrder.status,
+              source: 'delivery_status',
+            },
+          },
+          client,
+        );
+      }
 
       return {
         deliveryJob: updatedDeliveryJob,

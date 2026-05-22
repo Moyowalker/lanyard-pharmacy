@@ -1,4 +1,8 @@
 import { Module } from '@nestjs/common';
+import { InventorySyncService } from './inventory-sync.service';
 
-@Module({})
+@Module({
+	providers: [InventorySyncService],
+	exports: [InventorySyncService],
+})
 export class InventorySyncModule {}

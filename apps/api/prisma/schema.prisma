@@ -22,6 +22,7 @@ enum PrescriptionStatus {
   submitted
   under_review
   approved
+  fulfilled
   rejected
   clarification_requested
 }
@@ -51,6 +52,24 @@ enum DeliveryStatus {
   cancelled
 }
 
+enum WorkflowEventStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum NotificationChannel {
+  email
+  sms
+}
+
+enum NotificationDeliveryStatus {
+  queued
+  sent
+  failed
+}
+
 model Branch {
   id               String           @id @db.VarChar(64)
   name             String
@@ -58,6 +77,7 @@ model Branch {
   supportsDelivery Boolean          @default(true)
   branchProducts   BranchProduct[]
   inventoryBatches InventoryBatch[]
+  lowStockAlerts   LowStockAlert[]
   pharmacyOrders   PharmacyOrder[]
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -90,6 +110,7 @@ model Product {
   price                Int
   branchProducts       BranchProduct[]
   inventoryBatches     InventoryBatch[]
+  lowStockAlerts       LowStockAlert[]
   orderItems           OrderItem[]
   inventoryReservations InventoryReservation[]
   createdAt            DateTime         @default(now())
@@ -101,6 +122,7 @@ model Product {
 model BranchProduct {
   branchId  String   @db.VarChar(64)
   productId String   @db.VarChar(64)
+  lowStockThreshold Int @default(5)
   createdAt DateTime @default(now())
   branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -127,6 +149,23 @@ model InventoryBatch {
   @@unique([branchId, batchCode])
   @@index([branchId, productId])
   @@map("inventory_batches")
+}
+
+model LowStockAlert {
+  id                String   @id @db.VarChar(64)
+  branchId          String   @db.VarChar(64)
+  productId         String   @db.VarChar(64)
+  threshold         Int
+  availableQuantity Int
+  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([branchId, productId])
+  @@index([branchId])
+  @@index([productId])
+  @@map("low_stock_alerts")
 }
 
 model PharmacyOrder {
@@ -233,4 +272,58 @@ model DeliveryJob {
   updatedAt         DateTime             @updatedAt
 
   @@map("delivery_jobs")
+}
+
+model WorkflowEvent {
+  id                   String                       @id @db.VarChar(64)
+  eventType            String                       @db.VarChar(128)
+  entityType           String                       @db.VarChar(64)
+  entityId             String                       @db.VarChar(128)
+  status               WorkflowEventStatus         @default(pending)
+  attempts             Int                          @default(0)
+  payload              Json
+  errorMessage         String?                      @db.VarChar(512)
+  notificationAttempts NotificationDeliveryAttempt[]
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  processedAt          DateTime?
+
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@map("workflow_events")
+}
+
+model NotificationDeliveryAttempt {
+  id             String                     @id @db.VarChar(64)
+  workflowEventId String                    @db.VarChar(64)
+  channel        NotificationChannel
+  recipient      String                     @db.VarChar(255)
+  template       String                     @db.VarChar(128)
+  provider       String                     @db.VarChar(64)
+  status         NotificationDeliveryStatus @default(queued)
+  payload        Json
+  errorMessage   String?                    @db.VarChar(512)
+  workflowEvent  WorkflowEvent              @relation(fields: [workflowEventId], references: [id], onDelete: Cascade)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  sentAt         DateTime?
+
+  @@index([workflowEventId])
+  @@index([status, createdAt])
+  @@map("notification_delivery_attempts")
+}
+
+model AuditEvent {
+  id         String   @id @db.VarChar(64)
+  actorId    String?  @db.VarChar(64)
+  actorEmail String?  @db.VarChar(255)
+  entityType String   @db.VarChar(64)
+  entityId   String   @db.VarChar(128)
+  action     String   @db.VarChar(64)
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_events")
 }

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
@@ -23,6 +23,13 @@ describe('Workflow writes (db)', () => {
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
   });
 
@@ -75,6 +82,295 @@ describe('Workflow writes (db)', () => {
     expect(mainPanadol.reservedQuantity).toBe(1);
     expect(mainAmoxicillin.availableQuantity).toBe(31);
     expect(mainAmoxicillin.reservedQuantity).toBe(1);
+  });
+
+  it('creates and updates a customer profile with normalized fields', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/api/v1/customers')
+      .set(headers)
+      .send({
+        firstName: 'Kemi',
+        lastName: 'Adeyemi',
+        email: 'KEMI@example.com',
+        phone: '+2348000000099',
+        refillReminderOptIn: true,
+      })
+      .expect(201);
+
+    expect(createResponse.body.email).toBe('kemi@example.com');
+    expect(createResponse.body.refillReminderOptIn).toBe(true);
+
+    const updateResponse = await request(app.getHttpServer())
+      .patch(`/api/v1/customers/${createResponse.body.id}`)
+      .set(headers)
+      .send({
+        lastName: 'Ogunleye',
+        email: 'kemi.ogunleye@example.com',
+        refillReminderOptIn: false,
+      })
+      .expect(200);
+
+    expect(updateResponse.body.lastName).toBe('Ogunleye');
+    expect(updateResponse.body.email).toBe('kemi.ogunleye@example.com');
+    expect(updateResponse.body.refillReminderOptIn).toBe(false);
+
+    const savedCustomer = await prisma.customer.findUniqueOrThrow({
+      where: {
+        id: createResponse.body.id,
+      },
+    });
+
+    expect(savedCustomer.email).toBe('kemi.ogunleye@example.com');
+    expect(savedCustomer.lastName).toBe('Ogunleye');
+    expect(savedCustomer.refillReminderOptIn).toBe(false);
+  });
+
+  it('persists audit events across customer, inventory, order, payment, prescription, and delivery mutations', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const customerResponse = await request(app.getHttpServer())
+      .post('/api/v1/customers')
+      .set(headers)
+      .send({
+        firstName: 'Amina',
+        lastName: 'Okoro',
+        email: 'amina.okoro@example.com',
+        phone: '+2348000000108',
+        refillReminderOptIn: true,
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch('/api/v1/inventory/batches/inv-pan-ex-main/adjust')
+      .set(headers)
+      .send({
+        quantityDelta: -1,
+        reason: 'Shelf reconciliation',
+      })
+      .expect(200);
+
+    const orderResponse = await request(app.getHttpServer())
+      .post('/api/v1/orders/checkout')
+      .set(headers)
+      .send({
+        customerId: customerResponse.body.id,
+        branchId: 'branch-main',
+        items: [
+          {
+            productId: 'prod-panadol-extra',
+            quantity: 1,
+          },
+        ],
+      })
+      .expect(201);
+
+    const paymentAttemptResponse = await request(app.getHttpServer())
+      .post('/api/v1/payments/attempts')
+      .set(headers)
+      .send({
+        orderId: orderResponse.body.order.id,
+        provider: 'paystack',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/payments/webhooks')
+      .send({
+        provider: 'paystack',
+        providerReference: paymentAttemptResponse.body.paymentAttempt.providerReference,
+        status: 'captured',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/orders/${orderResponse.body.order.id}/status`)
+      .set(headers)
+      .send({ status: 'ready_for_dispatch' })
+      .expect(200);
+
+    const deliveryResponse = await request(app.getHttpServer())
+      .post('/api/v1/delivery/jobs')
+      .set(headers)
+      .send({
+        orderId: orderResponse.body.order.id,
+        dispatchMode: 'manual_dispatch',
+        assignedTo: 'dispatcher-001',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/delivery/jobs/${deliveryResponse.body.deliveryJob.id}/status`)
+      .set(headers)
+      .send({ status: 'in_transit' })
+      .expect(200);
+
+    const prescriptionSubmissionResponse = await request(app.getHttpServer())
+      .post('/api/v1/prescriptions')
+      .set(headers)
+      .send({
+        customerId: 'cust-100',
+        orderId: 'ord-1001',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/prescriptions/${prescriptionSubmissionResponse.body.prescription.id}/start-review`)
+      .set(headers)
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/prescriptions/${prescriptionSubmissionResponse.body.prescription.id}/review`)
+      .set(headers)
+      .send({ action: 'approve' })
+      .expect(201);
+
+    const auditEvents = await prisma.auditEvent.findMany();
+    const entityTypes = [...new Set(auditEvents.map((event) => event.entityType))];
+
+    expect(entityTypes).toEqual(
+      expect.arrayContaining(['customer', 'inventory', 'order', 'payment', 'prescription', 'delivery']),
+    );
+
+    expect(auditEvents.some((event) => event.entityType === 'customer' && event.action === 'created')).toBe(true);
+    expect(auditEvents.some((event) => event.entityType === 'inventory' && event.action === 'batch_adjusted')).toBe(
+      true,
+    );
+    expect(auditEvents.some((event) => event.entityType === 'payment' && event.action === 'webhook_reconciled')).toBe(
+      true,
+    );
+    expect(auditEvents.some((event) => event.entityType === 'prescription' && event.action === 'reviewed')).toBe(
+      true,
+    );
+    expect(auditEvents.some((event) => event.entityType === 'delivery' && event.action === 'assigned')).toBe(true);
+  });
+
+  it('adjusts inventory batches and opens then resolves low-stock alerts', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const lowStockResponse = await request(app.getHttpServer())
+      .patch('/api/v1/inventory/batches/inv-pan-ex-main/adjust')
+      .set(headers)
+      .send({
+        quantityDelta: -136,
+        reason: 'Cycle count shrinkage',
+      })
+      .expect(200);
+
+    expect(lowStockResponse.body.batch.availableQuantity).toBe(4);
+    expect(lowStockResponse.body.lowStockAlertAction).toBe('opened');
+    expect(lowStockResponse.body.lowStockAlert.availableQuantity).toBe(4);
+    expect(lowStockResponse.body.lowStockAlert.threshold).toBe(5);
+
+    const alertsResponse = await request(app.getHttpServer())
+      .get('/api/v1/inventory/branches/branch-main/alerts')
+      .set(headers)
+      .expect(200);
+
+    expect(alertsResponse.body).toHaveLength(1);
+    expect(alertsResponse.body[0].productId).toBe('prod-panadol-extra');
+
+    const replenishmentResponse = await request(app.getHttpServer())
+      .patch('/api/v1/inventory/batches/inv-pan-ex-main/adjust')
+      .set(headers)
+      .send({
+        quantityDelta: 6,
+        reason: 'Emergency restock',
+      })
+      .expect(200);
+
+    expect(replenishmentResponse.body.batch.availableQuantity).toBe(10);
+    expect(replenishmentResponse.body.lowStockAlertAction).toBe('resolved');
+    expect(replenishmentResponse.body.lowStockAlert).toBeNull();
+
+    const savedAlerts = await prisma.lowStockAlert.findMany({
+      where: {
+        branchId: 'branch-main',
+        productId: 'prod-panadol-extra',
+      },
+    });
+
+    expect(savedAlerts).toHaveLength(0);
+  });
+
+  it('rejects invalid customer emails before persistence', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    await request(app.getHttpServer())
+      .post('/api/v1/customers')
+      .set(headers)
+      .send({
+        firstName: 'Kemi',
+        lastName: 'Adeyemi',
+        email: 'not-an-email',
+        phone: '+2348000000099',
+      })
+      .expect(400);
+  });
+
+  it('rejects customer updates when email conflicts with an existing profile', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const conflictResponse = await request(app.getHttpServer())
+      .patch('/api/v1/customers/cust-101')
+      .set(headers)
+      .send({
+        email: 'ada@example.com',
+      })
+      .expect(409);
+
+    expect(conflictResponse.body.message).toContain('Customer');
   });
 
   it('previews a cart and creates an order with persisted line items', async () => {
@@ -243,6 +539,106 @@ describe('Workflow writes (db)', () => {
 
     expect(airportPanadol.availableQuantity).toBe(17);
     expect(airportPanadol.reservedQuantity).toBe(3);
+  });
+
+  it('submits, reviews, approves, and fulfills a prescription into ready-for-dispatch', async () => {
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const checkoutResponse = await request(app.getHttpServer())
+      .post('/api/v1/orders/checkout')
+      .set(headers)
+      .send({
+        customerId: 'cust-100',
+        branchId: 'branch-main',
+        items: [
+          {
+            productId: 'prod-amoxicillin-500',
+            quantity: 1,
+          },
+        ],
+      })
+      .expect(201);
+
+    expect(checkoutResponse.body.order.status).toBe('pending_review');
+
+    const submissionResponse = await request(app.getHttpServer())
+      .post('/api/v1/prescriptions')
+      .set(headers)
+      .send({
+        customerId: 'cust-100',
+        orderId: checkoutResponse.body.order.id,
+      })
+      .expect(201);
+
+    expect(submissionResponse.body.prescription.status).toBe('submitted');
+
+    const reviewStartResponse = await request(app.getHttpServer())
+      .post(`/api/v1/prescriptions/${submissionResponse.body.prescription.id}/start-review`)
+      .set(headers)
+      .expect(201);
+
+    expect(reviewStartResponse.body.prescription.status).toBe('under_review');
+
+    const approvalResponse = await request(app.getHttpServer())
+      .post(`/api/v1/prescriptions/${submissionResponse.body.prescription.id}/review`)
+      .set(headers)
+      .send({ action: 'approve' })
+      .expect(201);
+
+    expect(approvalResponse.body.prescription.status).toBe('approved');
+    expect(approvalResponse.body.order.status).toBe('awaiting_payment');
+
+    const paymentAttemptResponse = await request(app.getHttpServer())
+      .post('/api/v1/payments/attempts')
+      .set(headers)
+      .send({
+        orderId: checkoutResponse.body.order.id,
+        provider: 'paystack',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/payments/webhooks')
+      .send({
+        provider: 'paystack',
+        providerReference: paymentAttemptResponse.body.paymentAttempt.providerReference,
+        status: 'captured',
+      })
+      .expect(201);
+
+    const fulfillmentResponse = await request(app.getHttpServer())
+      .post(`/api/v1/prescriptions/${submissionResponse.body.prescription.id}/fulfill`)
+      .set(headers)
+      .expect(201);
+
+    expect(fulfillmentResponse.body.prescription.status).toBe('fulfilled');
+    expect(fulfillmentResponse.body.order.status).toBe('ready_for_dispatch');
+
+    const savedPrescription = await prisma.prescription.findUniqueOrThrow({
+      where: {
+        id: submissionResponse.body.prescription.id,
+      },
+    });
+
+    expect(savedPrescription.status).toBe('fulfilled');
+
+    const savedOrder = await prisma.pharmacyOrder.findUniqueOrThrow({
+      where: {
+        id: checkoutResponse.body.order.id,
+      },
+    });
+
+    expect(savedOrder.status).toBe('ready_for_dispatch');
   });
 
   it('reconciles refund webhooks and cancels the linked order', async () => {

@@ -18,12 +18,17 @@
 ## Implemented PostgreSQL Slice
 
 - `DatabaseService` is now Prisma-backed and targets PostgreSQL.
-- Current PostgreSQL-backed repositories: branches, customers, catalog, inventory batches, orders, and prescriptions.
+- Current PostgreSQL-backed repositories: branches, customers, catalog, inventory batches, low-stock alerts, workflow events, notification delivery attempts, orders, prescriptions, delivery jobs, payment attempts, and audit events.
 - Order and prescription transition logic remains in explicit workflow classes and is independent of the persistence adapter.
+- Customers now expose validated create and update workflows with PostgreSQL-backed uniqueness enforcement on email and phone.
+- Inventory now exposes batch stock adjustments and persisted active low-stock alerts for branch-product combinations.
 - Order items and inventory reservations are now persisted in PostgreSQL and used by the write-side workflow services.
 - Orders now expose cart preview and checkout flows that persist `order_items` and derive initial order state from the cart contents.
 - Payment attempts now persist in PostgreSQL and webhook reconciliation updates linked order workflow state and inventory reservations.
+- Prescriptions now expose submission, start-review, review, and fulfillment flows, with fulfillment moving linked orders into `ready_for_dispatch`.
 - Delivery jobs now persist in PostgreSQL and drive assignment plus delivery-status transitions against linked orders.
+- API-side customer, inventory, order, payment, prescription, and delivery mutations now emit persisted audit events in PostgreSQL.
+- API-side order, payment, inventory, and prescription mutations now also emit persisted workflow events, and worker modules drain those events into notification delivery attempts plus worker-side audit trails.
 
 ## Current Exposed Endpoints
 
@@ -33,12 +38,19 @@
 - `GET /api/v1/branches`
 - `GET /api/v1/catalog/products`
 - `GET /api/v1/inventory/branches/:branchId/stock`
+- `GET /api/v1/inventory/branches/:branchId/alerts`
+- `PATCH /api/v1/inventory/batches/:batchId/adjust`
+- `POST /api/v1/customers`
+- `PATCH /api/v1/customers/:customerId`
 - `GET /api/v1/orders`
 - `POST /api/v1/orders/cart/preview`
 - `POST /api/v1/orders/checkout`
 - `PATCH /api/v1/orders/:orderId/status`
+- `POST /api/v1/prescriptions`
 - `GET /api/v1/prescriptions/queue`
+- `POST /api/v1/prescriptions/:prescriptionId/start-review`
 - `POST /api/v1/prescriptions/:prescriptionId/review`
+- `POST /api/v1/prescriptions/:prescriptionId/fulfill`
 - `GET /api/v1/customers`
 - `GET /api/v1/payments/providers`
 - `POST /api/v1/payments/attempts`
@@ -61,11 +73,13 @@ Use `pnpm --filter @lanyard/api db:migrate` when changing the Prisma schema and 
 
 GitHub Actions now runs the DB-backed workflow suite against a disposable PostgreSQL service via `.github/workflows/api-db-workflows.yml`.
 
+Worker-side event processing is validated with `pnpm --filter @lanyard/worker test:e2e` against the same PostgreSQL database used by the API app.
+
 ## Next Persistence Step
 
-- Persist audit events in PostgreSQL.
-- Add branch-scoped write use cases for customer management and stock adjustments.
+- Add durable queue configuration, retry policies, and dead-letter handling for worker job processing.
 - Broaden CI coverage from the DB-backed workflow suite to the wider API verification matrix.
+- Add structured logging, metrics, and alertable failure monitoring for API and worker processes.
 
 ## Worker Modules
 

@@ -1,4 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
+import { WorkflowEventsRepository } from '../../database/repositories/workflow-events.repository';
+import { NotificationsService } from './notifications.service';
 
-@Module({})
+@Global()
+@Module({
+	providers: [NotificationsService, WorkflowEventsRepository],
+	exports: [NotificationsService],
+})
 export class NotificationsModule {}
