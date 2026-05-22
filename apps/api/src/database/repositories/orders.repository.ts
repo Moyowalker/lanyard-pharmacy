@@ -133,6 +133,25 @@ export class OrdersRepository {
     }));
   }
 
+  async listByCustomerId(customerId: string): Promise<OrderRecord[]> {
+    const orders = await this.database.pharmacyOrder.findMany({
+      where: { customerId },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return orders.map((order) => ({
+      id: order.id,
+      customerId: order.customerId,
+      status: order.status,
+      branchId: order.branchId,
+      total: order.total,
+      containsPrescriptionItems: order.containsPrescriptionItems,
+      createdAt: order.createdAt.toISOString(),
+    }));
+  }
+
   async updateStatus(orderId: string, status: OrderStatus, client?: Prisma.TransactionClient): Promise<OrderDetailRecord> {
     const order = await this.executor(client).pharmacyOrder.update({
       where: { id: orderId },

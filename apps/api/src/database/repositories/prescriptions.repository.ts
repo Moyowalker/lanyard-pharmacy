@@ -87,6 +87,20 @@ export class PrescriptionsRepository {
     }));
   }
 
+  async listByCustomerId(customerId: string): Promise<PrescriptionDetailRecord[]> {
+    const prescriptions = await this.database.prescription.findMany({
+      where: { customerId },
+      include: {
+        order: true,
+      },
+      orderBy: {
+        uploadedAt: 'desc',
+      },
+    });
+
+    return prescriptions.map((prescription) => this.mapPrescription(prescription));
+  }
+
   async updateStatus(
     prescriptionId: string,
     status: PrescriptionStatus,

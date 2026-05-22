@@ -13,6 +13,12 @@ import { PrescriptionsService } from './prescriptions.service';
 export class PrescriptionsController {
   constructor(private readonly prescriptionsService: PrescriptionsService) {}
 
+  @Roles('customer')
+  @Get('me')
+  listMyPrescriptions(@CurrentUser() actor: AuthenticatedUser) {
+    return this.prescriptionsService.listCustomerPrescriptions(actor);
+  }
+
   @Roles('customer', 'pharmacist', 'branch_manager', 'support_admin', 'super_admin')
   @Post()
   submitPrescription(@Body() body: SubmitPrescriptionDto, @CurrentUser() actor: AuthenticatedUser) {

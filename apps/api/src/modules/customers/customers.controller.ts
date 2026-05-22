@@ -13,6 +13,12 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
+  @Roles('customer')
+  @Get('me')
+  me(@CurrentUser() actor: AuthenticatedUser) {
+    return this.customersService.getCustomerProfile(actor);
+  }
+
   @Roles('pharmacist', 'support_admin', 'super_admin')
   @Post()
   createCustomer(@Body() body: CreateCustomerDto, @CurrentUser() actor: AuthenticatedUser) {

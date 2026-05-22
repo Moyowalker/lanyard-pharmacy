@@ -23,6 +23,16 @@ export class CustomersService {
     return this.customersRepository.list();
   }
 
+  async getCustomerProfile(actor: AuthenticatedUser) {
+    const customer = await this.customersRepository.findById(actor.sub);
+
+    if (!customer) {
+      throw new NotFoundException(`Customer ${actor.sub} was not found`);
+    }
+
+    return customer;
+  }
+
   async createCustomer(input: CreateCustomerDto, actor: AuthenticatedUser) {
     const normalizedInput = this.normalizeCreateInput(input);
 

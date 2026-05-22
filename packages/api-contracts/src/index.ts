@@ -79,4 +79,3 @@ export const WORKFLOW_EVENT_STATUSES = [
 ] as const;
 export type WorkflowEventStatus = (typeof WORKFLOW_EVENT_STATUSES)[number];
 
-export * from './client';

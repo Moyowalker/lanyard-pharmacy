@@ -13,7 +13,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 
 - `apps/api` already contains scaffolded platform modules, health endpoints, auth and branch-aware access control, and several MVP read endpoints.
 - `apps/worker` already registers the main async workflow modules.
-- `apps/web` and `apps/admin` now share foundational layout, state, and typed client scaffolding, but product-specific workflows are still not started.
+- `apps/web` now includes the public landing page, storefront navigation, branch-aware service planning, catalog discovery, product detail routing, and backend-backed cart or checkout flows; `apps/admin` shares the same validation and feedback conventions for branch-context operator forms.
 
 ## Frontend Deliverables
 
@@ -22,24 +22,24 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Establish reusable UI primitives in `packages/ui` for forms, tables, status badges, dialogs, and navigation.
 - [x] Define responsive layout patterns, design tokens, and shared loading, empty, error, and unauthorized states.
 - [x] Add typed API client utilities and shared session or auth helpers for `apps/web` and `apps/admin`.
-- [ ] Define form validation, user feedback, and error-handling conventions across both frontend apps.
+- [x] Define form validation, user feedback, and error-handling conventions across both frontend apps.
 
 ### Web Storefront MVP
 
-- [ ] Build the public landing page and primary storefront navigation.
-- [ ] Build branch selection and service-availability flow for pickup and delivery context.
-- [ ] Build catalog browsing and search experience connected to backend catalog data.
-- [ ] Build product detail pages with branch-aware stock visibility and product metadata.
-- [ ] Build cart and checkout flows for pickup and delivery orders.
-- [ ] Build prescription upload or request flow for regulated products.
-- [ ] Build customer account views for profile, order history, and order status tracking.
+- [x] Build the public landing page and primary storefront navigation.
+- [x] Build branch selection and service-availability flow for pickup and delivery context.
+- [x] Build catalog browsing and search experience connected to backend catalog data.
+- [x] Build product detail pages with branch-aware stock visibility and product metadata.
+- [x] Build cart and checkout flows for pickup and delivery orders.
+- [x] Build prescription upload or request flow for regulated products.
+- [x] Build customer account views for profile, order history, and order status tracking.
 
 ### Admin Operations MVP
 
-- [ ] Build the authenticated admin shell with role-aware navigation and branch context.
-- [ ] Build a branch-scoped operations dashboard for daily activity and alerts.
-- [ ] Build catalog management screens for product data, availability, and merchandising controls.
-- [ ] Build inventory management screens for stock visibility, stock adjustments, and low-stock alerts.
+- [x] Build the authenticated admin shell with role-aware navigation and branch context.
+- [x] Build a branch-scoped operations dashboard for daily activity and alerts.
+- [x] Build catalog management screens for product data, availability, and merchandising controls.
+- [x] Build inventory management screens for stock visibility, stock adjustments, and low-stock alerts.
 - [ ] Build order management screens for queueing, fulfillment, and delivery status handling.
 - [ ] Build prescription review and approval workflows for pharmacy staff.
 - [ ] Build customer support views for customer history, communication context, and issue handling.

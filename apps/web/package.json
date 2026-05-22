@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack --port 3000",
-    "build": "next build",
+    "build": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })\" && next build",
     "start": "next start --port 3000",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"

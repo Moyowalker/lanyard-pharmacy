@@ -25,6 +25,12 @@ export class OrdersController {
     return this.ordersService.checkout(body, actor);
   }
 
+  @Roles('customer')
+  @Get('me')
+  listMyOrders(@CurrentUser() actor: AuthenticatedUser) {
+    return this.ordersService.listCustomerOrders(actor);
+  }
+
   @Roles('pharmacist', 'branch_manager', 'dispatcher', 'support_admin', 'super_admin')
   @Get()
   listOrders() {

@@ -13,6 +13,13 @@ type DemoUserRecord = {
 
 const DEMO_USERS: DemoUserRecord[] = [
   {
+    id: 'cust-100',
+    email: 'ada@example.com',
+    password: 'Customer123!',
+    roles: ['customer'],
+    branchIds: [],
+  },
+  {
     id: 'staff-001',
     email: 'pharmacist@lanyardpharmacy.com',
     password: 'Pharmacy123!',

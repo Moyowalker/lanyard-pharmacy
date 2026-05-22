@@ -62,6 +62,20 @@ export class CatalogRepository {
     return products.map((product) => this.mapProduct(product));
   }
 
+  async addBranchProduct(productId: string, branchId: string): Promise<void> {
+    await this.database.branchProduct.upsert({
+      where: { branchId_productId: { branchId, productId } },
+      create: { branchId, productId },
+      update: {},
+    });
+  }
+
+  async removeBranchProduct(productId: string, branchId: string): Promise<void> {
+    await this.database.branchProduct.deleteMany({
+      where: { branchId, productId },
+    });
+  }
+
   private executor(client?: Prisma.TransactionClient) {
     return client ?? this.database;
   }

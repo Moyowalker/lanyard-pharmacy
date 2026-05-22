@@ -31,6 +31,10 @@ export class PrescriptionsService {
     return this.prescriptionsRepository.listQueue();
   }
 
+  listCustomerPrescriptions(actor: AuthenticatedUser) {
+    return this.prescriptionsRepository.listByCustomerId(actor.sub);
+  }
+
   async submitPrescription(input: SubmitPrescriptionDto, actor: AuthenticatedUser) {
     return this.database.transaction(async (client) => {
       const customer = await this.customersRepository.findById(input.customerId, client);

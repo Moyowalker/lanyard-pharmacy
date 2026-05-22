@@ -1,16 +1,75 @@
 @import "tailwindcss";
 
-html,
-body {
-	margin: 0;
-	min-height: 100%;
+/* ── Admin design tokens ── */
+:root {
+  /* Brand */
+  --brand:          #16a34a;
+  --brand-hover:    #15803d;
+  --brand-soft:     #dcfce7;
+  --brand-muted:    #bbf7d0;
+
+  /* Surfaces */
+  --canvas:         #f8fafc;
+  --surface:        #ffffff;
+  --surface-alt:    #f1f5f9;
+
+  /* Typography */
+  --ink:            #0f172a;
+  --ink-muted:      #475569;
+  --ink-subtle:     #94a3b8;
+
+  /* Borders */
+  --border:         #e2e8f0;
+  --border-strong:  #cbd5e1;
+
+  /* Status */
+  --danger:         #dc2626;
+  --danger-soft:    #fff1f1;
+  --warning:        #d97706;
+  --warning-soft:   #fef9ee;
+
+  /* Elevation */
+  --shadow-card:     0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-elevated: 0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
-	color: #162118;
-	background: #f6f2e7;
+  color: var(--ink);
+  background: var(--canvas);
+  font-family: var(--font-inter, Inter, -apple-system, sans-serif);
 }
 
-* {
-	box-sizing: border-box;
+* { box-sizing: border-box; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar           { width: 5px; height: 5px; }
+::-webkit-scrollbar-track     { background: var(--canvas); }
+::-webkit-scrollbar-thumb     { background: var(--border-strong); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand); }
+
+/* ── Keyframes ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fadeIn 0.2s ease both; }
+.animate-fade-up { animation: fadeUp 0.3s ease both; }
+
+/* ── Focus ring ── */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }

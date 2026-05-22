@@ -1,4 +1,4 @@
-import type { PlatformHealth, PlatformRole } from './index';
+import type { OrderStatus, PlatformHealth, PlatformRole, PrescriptionStatus } from './index.js';
 
 export type AuthenticatedPlatformUser = {
   sub: string;
@@ -17,6 +17,22 @@ export type LoginResponse = {
   user: AuthenticatedPlatformUser;
 };
 
+export type BranchSummary = {
+  id: string;
+  name: string;
+  city: string;
+  supportsDelivery: boolean;
+};
+
+export type CustomerProfile = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  refillReminderOptIn: boolean;
+};
+
 export type CatalogProduct = {
   id: string;
   name: string;
@@ -26,6 +42,98 @@ export type CatalogProduct = {
   dosageForm: string;
   price: number;
   branchIds: string[];
+};
+
+export type CartLineInput = {
+  productId: string;
+  quantity: number;
+};
+
+export type CartRequest = {
+  customerId: string;
+  branchId: string;
+  items: CartLineInput[];
+};
+
+export type CartSummaryItem = {
+  productId: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  requiresPrescription: boolean;
+  availableQuantity: number;
+};
+
+export type CartSummary = {
+  customerId: string;
+  customerEmail: string;
+  branchId: string;
+  itemCount: number;
+  total: number;
+  containsPrescriptionItems: boolean;
+  nextOrderStatus: string;
+  items: CartSummaryItem[];
+};
+
+export type CheckoutOrder = {
+  id: string;
+  customerId: string;
+  status: string;
+  branchId: string;
+  total: number;
+  containsPrescriptionItems: boolean;
+  createdAt: string;
+  items: Array<{
+    id: string;
+    orderId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+  inventoryReservations: Array<{
+    id: string;
+    orderId: string;
+    inventoryBatchId: string;
+    productId: string;
+    quantity: number;
+  }>;
+};
+
+export type CheckoutResponse = {
+  order: CheckoutOrder;
+  cart: CartSummary;
+};
+
+export type CustomerOrderSummary = {
+  id: string;
+  customerId: string;
+  status: OrderStatus;
+  branchId: string;
+  total: number;
+  containsPrescriptionItems: boolean;
+  createdAt: string;
+};
+
+export type CustomerPrescriptionSummary = {
+  id: string;
+  customerId: string;
+  orderId: string | null;
+  status: PrescriptionStatus;
+  reviewedBy: string | null;
+  uploadedAt: string;
+  orderBranchId: string | null;
+  orderStatus: OrderStatus | null;
+};
+
+export type SubmitPrescriptionRequest = {
+  customerId: string;
+  orderId?: string;
+};
+
+export type SubmitPrescriptionResponse = {
+  prescription: CustomerPrescriptionSummary;
+  order: CheckoutOrder | null;
 };
 
 export type PlatformSession = {
@@ -39,6 +147,46 @@ export type ApiClientResponseLike = {
   status: number;
   json(): Promise<unknown>;
   text(): Promise<string>;
+};
+
+export type InventoryBatchRecord = {
+  id: string;
+  branchId: string;
+  productId: string;
+  availableQuantity: number;
+  reservedQuantity: number;
+  batchCode: string;
+  expiryDate: string;
+};
+
+export type LowStockAlertRecord = {
+  id: string;
+  branchId: string;
+  productId: string;
+  threshold: number;
+  availableQuantity: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdjustInventoryBatchRequest = {
+  quantityDelta: number;
+  reason: string;
+};
+
+export type AdminPrescriptionRecord = {
+  id: string;
+  customerId: string;
+  orderId: string | null;
+  status: PrescriptionStatus;
+  reviewedBy: string | null;
+  uploadedAt: string;
+  orderBranchId?: string | null;
+  orderStatus?: OrderStatus | null;
+};
+
+export type UpdateOrderStatusRequest = {
+  status: OrderStatus;
 };
 
 export type ApiClientFetch = (input: string, init?: {
@@ -147,8 +295,39 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     baseUrl,
     login: (payload: LoginRequest) => request<LoginResponse>('/api/v1/auth/login', { method: 'POST', body: payload }),
     getProfile: () => request<AuthenticatedPlatformUser>('/api/v1/auth/me'),
+    getCustomerProfile: () => request<CustomerProfile>('/api/v1/customers/me'),
     getApiHealth: () => request<PlatformHealth>('/api/v1/health'),
     getWorkerHealth: () => request<PlatformHealth>('/health'),
+    listBranches: () => request<BranchSummary[]>('/api/v1/branches'),
     listCatalogProducts: () => request<CatalogProduct[]>('/api/v1/catalog/products'),
+    listMyOrders: () => request<CustomerOrderSummary[]>('/api/v1/orders/me'),
+    listMyPrescriptions: () => request<CustomerPrescriptionSummary[]>('/api/v1/prescriptions/me'),
+    submitPrescription: (payload: SubmitPrescriptionRequest) => request<SubmitPrescriptionResponse>('/api/v1/prescriptions', { method: 'POST', body: payload }),
+    previewCart: (payload: CartRequest) => request<CartSummary>('/api/v1/orders/cart/preview', { method: 'POST', body: payload }),
+    checkout: (payload: CartRequest) => request<CheckoutResponse>('/api/v1/orders/checkout', { method: 'POST', body: payload }),
+    // Admin order management
+    listAdminOrders: () => request<CustomerOrderSummary[]>('/api/v1/orders'),
+    updateOrderStatus: (orderId: string, payload: UpdateOrderStatusRequest) =>
+      request<CustomerOrderSummary>(`/api/v1/orders/${orderId}/status`, { method: 'PATCH', body: payload }),
+    // Admin prescription management
+    listPrescriptionQueue: () => request<AdminPrescriptionRecord[]>('/api/v1/prescriptions/queue'),
+    startPrescriptionReview: (prescriptionId: string) =>
+      request<AdminPrescriptionRecord>(`/api/v1/prescriptions/${prescriptionId}/start-review`, { method: 'POST' }),
+    reviewPrescription: (prescriptionId: string, action: 'approve' | 'reject' | 'request_clarification') =>
+      request<AdminPrescriptionRecord>(`/api/v1/prescriptions/${prescriptionId}/review`, { method: 'POST', body: { action } }),
+    fulfillPrescription: (prescriptionId: string) =>
+      request<AdminPrescriptionRecord>(`/api/v1/prescriptions/${prescriptionId}/fulfill`, { method: 'POST' }),
+    // Admin inventory management
+    getBranchInventory: (branchId: string) =>
+      request<InventoryBatchRecord[]>(`/api/v1/inventory/branches/${branchId}/stock`),
+    listLowStockAlerts: (branchId: string) =>
+      request<LowStockAlertRecord[]>(`/api/v1/inventory/branches/${branchId}/alerts`),
+    adjustInventoryBatch: (batchId: string, payload: AdjustInventoryBatchRequest) =>
+      request<InventoryBatchRecord>(`/api/v1/inventory/batches/${batchId}/adjust`, { method: 'PATCH', body: payload }),
+    // Admin catalog management
+    setBranchProductAvailability: (productId: string, branchId: string, available: boolean) =>
+      available
+        ? request<void>(`/api/v1/catalog/products/${productId}/branches/${branchId}`, { method: 'PUT' })
+        : request<void>(`/api/v1/catalog/products/${productId}/branches/${branchId}`, { method: 'DELETE' }),
   };
 }

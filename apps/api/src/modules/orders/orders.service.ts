@@ -60,6 +60,10 @@ export class OrdersService {
     return this.ordersRepository.list();
   }
 
+  listCustomerOrders(actor: AuthenticatedUser) {
+    return this.ordersRepository.listByCustomerId(actor.sub);
+  }
+
   async previewCart(input: PreviewCartDto, actor: AuthenticatedUser) {
     return this.buildCartSummary(input, actor);
   }
