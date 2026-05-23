@@ -32,4 +32,8 @@ export class AuditService {
       client,
     );
   }
+
+  async list(limit = 100) {
+    return this.auditEventsRepository.findAll(limit);
+  }
 }

@@ -174,6 +174,46 @@ export type AdjustInventoryBatchRequest = {
   reason: string;
 };
 
+export type AuditEventRecord = {
+  id: string;
+  actorId: string | null;
+  actorEmail: string | null;
+  entityType: string;
+  entityId: string;
+  action: string;
+  payload: unknown;
+  createdAt: string;
+};
+
+export type NotificationDeliveryAttemptRecord = {
+  id: string;
+  workflowEventId: string;
+  channel: string;
+  recipient: string;
+  template: string;
+  provider: string;
+  status: string;
+  errorMessage: string | null;
+  createdAt: string;
+  sentAt: string | null;
+};
+
+export type WorkflowEventRecord = {
+  id: string;
+  eventType: string;
+  entityType: string;
+  entityId: string;
+  status: string;
+  attempts: number;
+  maxAttempts: number;
+  payload: unknown;
+  errorMessage: string | null;
+  createdAt: string;
+  processedAt: string | null;
+  deadLetteredAt: string | null;
+  notificationAttempts: NotificationDeliveryAttemptRecord[];
+};
+
 export type AdminPrescriptionRecord = {
   id: string;
   customerId: string;
@@ -300,13 +340,16 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     getWorkerHealth: () => request<PlatformHealth>('/health'),
     listBranches: () => request<BranchSummary[]>('/api/v1/branches'),
     listCatalogProducts: () => request<CatalogProduct[]>('/api/v1/catalog/products'),
+    listCustomers: () => request<CustomerProfile[]>('/api/v1/customers'),
     listMyOrders: () => request<CustomerOrderSummary[]>('/api/v1/orders/me'),
+    getMyOrder: (orderId: string) => request<CheckoutOrder>(`/api/v1/orders/${orderId}`),
     listMyPrescriptions: () => request<CustomerPrescriptionSummary[]>('/api/v1/prescriptions/me'),
     submitPrescription: (payload: SubmitPrescriptionRequest) => request<SubmitPrescriptionResponse>('/api/v1/prescriptions', { method: 'POST', body: payload }),
     previewCart: (payload: CartRequest) => request<CartSummary>('/api/v1/orders/cart/preview', { method: 'POST', body: payload }),
     checkout: (payload: CartRequest) => request<CheckoutResponse>('/api/v1/orders/checkout', { method: 'POST', body: payload }),
     // Admin order management
     listAdminOrders: () => request<CustomerOrderSummary[]>('/api/v1/orders'),
+    getAdminOrder: (orderId: string) => request<CheckoutOrder>(`/api/v1/orders/${orderId}`),
     updateOrderStatus: (orderId: string, payload: UpdateOrderStatusRequest) =>
       request<CustomerOrderSummary>(`/api/v1/orders/${orderId}/status`, { method: 'PATCH', body: payload }),
     // Admin prescription management
@@ -329,5 +372,10 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       available
         ? request<void>(`/api/v1/catalog/products/${productId}/branches/${branchId}`, { method: 'PUT' })
         : request<void>(`/api/v1/catalog/products/${productId}/branches/${branchId}`, { method: 'DELETE' }),
+    // Audit & notifications
+    listAuditEvents: (limit?: number) =>
+      request<AuditEventRecord[]>(`/api/v1/audit/events${limit ? `?limit=${limit}` : ''}`),
+    listNotificationEvents: (limit?: number) =>
+      request<WorkflowEventRecord[]>(`/api/v1/audit/notifications${limit ? `?limit=${limit}` : ''}`),
   };
 }

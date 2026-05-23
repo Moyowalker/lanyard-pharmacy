@@ -30,6 +30,13 @@ export class AuditEventsRepository {
     });
   }
 
+  async findAll(limit = 100) {
+    return this.database.auditEvent.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
   private executor(client?: Prisma.TransactionClient) {
     return client ?? this.database;
   }

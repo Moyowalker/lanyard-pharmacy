@@ -64,6 +64,18 @@ export class OrdersService {
     return this.ordersRepository.listByCustomerId(actor.sub);
   }
 
+  async getOrderById(orderId: string, actor: AuthenticatedUser) {
+    const order = await this.ordersRepository.findById(orderId);
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} was not found`);
+    }
+    // Customers can only see their own orders
+    if (actor.roles.includes('customer') && order.customerId !== actor.sub) {
+      throw new NotFoundException(`Order ${orderId} was not found`);
+    }
+    return order;
+  }
+
   async previewCart(input: PreviewCartDto, actor: AuthenticatedUser) {
     return this.buildCartSummary(input, actor);
   }

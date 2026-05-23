@@ -36,6 +36,10 @@ const navItems = [
   { label: 'Dashboard', href: '/dashboard', active: false },
   { label: 'Catalog', href: '/catalog', active: false },
   { label: 'Inventory', href: '/inventory', active: true },
+  { label: 'Orders', href: '/orders', active: false },
+  { label: 'Prescriptions', href: '/prescriptions', active: false },
+  { label: 'Customers', href: '/customers', active: false },
+  { label: 'Audit', href: '/audit', active: false },
 ];
 
 type AdjustForm = {

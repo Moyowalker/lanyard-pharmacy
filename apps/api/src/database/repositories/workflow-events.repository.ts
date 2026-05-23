@@ -27,6 +27,14 @@ export class WorkflowEventsRepository {
     });
   }
 
+  async findAll(limit = 100) {
+    return this.database.workflowEvent.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: { notificationAttempts: { orderBy: { createdAt: 'desc' } } },
+    });
+  }
+
   private executor(client?: Prisma.TransactionClient) {
     return client ?? this.database;
   }

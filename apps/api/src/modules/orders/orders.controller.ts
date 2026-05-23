@@ -37,6 +37,15 @@ export class OrdersController {
     return this.ordersService.listOrders();
   }
 
+  @Roles('customer', 'pharmacist', 'branch_manager', 'dispatcher', 'support_admin', 'super_admin')
+  @Get(':orderId')
+  getOrder(
+    @Param('orderId') orderId: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.ordersService.getOrderById(orderId, actor);
+  }
+
   @Roles('pharmacist', 'branch_manager', 'dispatcher', 'support_admin', 'super_admin')
   @Patch(':orderId/status')
   transitionStatus(

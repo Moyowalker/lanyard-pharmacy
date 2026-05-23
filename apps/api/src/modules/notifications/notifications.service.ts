@@ -21,6 +21,10 @@ export type QueueWorkflowEventInput = {
 export class NotificationsService {
   constructor(private readonly workflowEventsRepository: WorkflowEventsRepository) {}
 
+  async listWorkflowEvents(limit = 100) {
+    return this.workflowEventsRepository.findAll(limit);
+  }
+
   async queueWorkflowEvent(input: QueueWorkflowEventInput, client?: Prisma.TransactionClient) {
     return this.workflowEventsRepository.create(
       {

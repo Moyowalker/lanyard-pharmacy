@@ -37,6 +37,10 @@ const navItems = [
   { label: 'Dashboard', href: '/dashboard', active: true },
   { label: 'Catalog', href: '/catalog', active: false },
   { label: 'Inventory', href: '/inventory', active: false },
+  { label: 'Orders', href: '/orders', active: false },
+  { label: 'Prescriptions', href: '/prescriptions', active: false },
+  { label: 'Customers', href: '/customers', active: false },
+  { label: 'Audit', href: '/audit', active: false },
 ];
 
 const statusTone = (status: OrderStatus): 'neutral' | 'warning' | 'success' | 'danger' => {

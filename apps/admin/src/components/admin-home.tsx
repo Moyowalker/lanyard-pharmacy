@@ -223,6 +223,26 @@ function getVisibleNavItems(roles: PlatformRole[], activeBranchLabel: string, al
       roles: ['inventory_officer', 'branch_manager', 'super_admin'],
     },
     {
+      label: 'Orders',
+      href: '/orders',
+      roles: ['pharmacist', 'branch_manager', 'dispatcher', 'support_admin', 'super_admin'],
+    },
+    {
+      label: 'Prescriptions',
+      href: '/prescriptions',
+      roles: ['pharmacist', 'support_admin', 'super_admin'],
+    },
+    {
+      label: 'Customers',
+      href: '/customers',
+      roles: ['pharmacist', 'support_admin', 'super_admin'],
+    },
+    {
+      label: 'Audit',
+      href: '/audit',
+      roles: ['pharmacist', 'support_admin', 'super_admin'],
+    },
+    {
       label: 'Queue health',
       href: '#queue',
       roles: ['pharmacist', 'branch_manager', 'inventory_officer', 'dispatcher', 'support_admin', 'super_admin'],
