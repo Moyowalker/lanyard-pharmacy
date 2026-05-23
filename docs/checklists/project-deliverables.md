@@ -40,10 +40,10 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Build a branch-scoped operations dashboard for daily activity and alerts.
 - [x] Build catalog management screens for product data, availability, and merchandising controls.
 - [x] Build inventory management screens for stock visibility, stock adjustments, and low-stock alerts.
-- [ ] Build order management screens for queueing, fulfillment, and delivery status handling.
-- [ ] Build prescription review and approval workflows for pharmacy staff.
-- [ ] Build customer support views for customer history, communication context, and issue handling.
-- [ ] Build audit and notification monitoring views for internal operations.
+- [x] Build order management screens for queueing, fulfillment, and delivery status handling.
+- [x] Build prescription review and approval workflows for pharmacy staff.
+- [x] Build customer support views for customer history, communication context, and issue handling.
+- [x] Build audit and notification monitoring views for internal operations.
 
 ## Backend Deliverables
 
@@ -53,9 +53,9 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Compose the worker platform module and register the main asynchronous workflow modules.
 - [x] Expose health endpoints for API and worker runtime checks.
 - [x] Establish JWT authentication, role checks, and branch-scoped access control.
-- [ ] Replace in-memory data stores with PostgreSQL-backed repositories.
-- [ ] Add database migrations for customers, branches, products, inventory batches, orders, prescriptions, and payment attempts.
-- [ ] Add repository and integration tests around the persistence boundary.
+- [x] Replace in-memory data stores with PostgreSQL-backed repositories.
+- [x] Add database migrations for customers, branches, products, inventory batches, orders, prescriptions, and payment attempts.
+- [x] Add repository and integration tests around the persistence boundary.
 
 ### Domain APIs And Workflows
 
