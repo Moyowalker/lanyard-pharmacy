@@ -4,7 +4,7 @@ services:
     name: lanyard-pharmacy-web
     region: oregon
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @lanyard/web build
-    startCommand: pnpm --filter @lanyard/web start
+    startCommand: pnpm --filter @lanyard/web exec next start --port $PORT
     healthCheckPath: /
     autoDeployTrigger: checksPass
     buildFilter:
@@ -28,7 +28,7 @@ services:
     name: lanyard-pharmacy-admin
     region: oregon
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @lanyard/admin build
-    startCommand: pnpm --filter @lanyard/admin start
+    startCommand: pnpm --filter @lanyard/admin exec next start --port $PORT
     healthCheckPath: /
     autoDeployTrigger: checksPass
     buildFilter:

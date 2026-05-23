@@ -169,7 +169,18 @@ export function persistCart(items: StorefrontCartItem[]) {
 }
 
 export function readStoredSession(): PlatformSession | null {
-  return parsePlatformSession(safeLocalStorageGet(PLATFORM_SESSION_STORAGE_KEY));
+  const session = parsePlatformSession(safeLocalStorageGet(PLATFORM_SESSION_STORAGE_KEY));
+
+  if (!session) {
+    return null;
+  }
+
+  if (isExpiredAccessToken(session.accessToken)) {
+    clearStoredSession();
+    return null;
+  }
+
+  return session;
 }
 
 export function persistSession(session: PlatformSession) {
@@ -213,5 +224,36 @@ function safeLocalStorageRemove(key: string) {
     window.localStorage.removeItem(key);
   } catch {
     // Ignore storage failures in private or restricted browser contexts.
+  }
+}
+
+function isExpiredAccessToken(accessToken: string) {
+  const payload = decodeJwtPayload(accessToken);
+
+  if (typeof payload?.exp !== 'number') {
+    return false;
+  }
+
+  return payload.exp * 1000 <= Date.now();
+}
+
+function decodeJwtPayload(accessToken: string): { exp?: number } | null {
+  const segments = accessToken.split('.');
+  const encodedPayload = segments[1];
+
+  if (!encodedPayload) {
+    return null;
+  }
+
+  const normalizedPayload = encodedPayload.replace(/-/g, '+').replace(/_/g, '/');
+  const paddedPayload = normalizedPayload.padEnd(
+    normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+    '=',
+  );
+
+  try {
+    return JSON.parse(window.atob(paddedPayload)) as { exp?: number };
+  } catch {
+    return null;
   }
 }

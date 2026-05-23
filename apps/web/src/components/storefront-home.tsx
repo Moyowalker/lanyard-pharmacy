@@ -477,13 +477,64 @@ export function StorefrontHome() {
     setCartPreview(null);
   }
 
+  function isUnauthorizedApiError(error: unknown) {
+    if (!(error instanceof Error)) {
+      return false;
+    }
+
+    return error.message.includes('"statusCode":401') || error.message.includes('Unauthorized');
+  }
+
+  async function withCustomerSessionRetry<T>(run: (accessToken: string, onUnauthorized: () => void) => Promise<T>) {
+    let activeSession = session;
+
+    if (!activeSession?.accessToken) {
+      activeSession = await getOrCreateDemoCustomerSession();
+      startTransition(() => {
+        setSession(activeSession);
+        setAuthNotice({
+          tone: 'success',
+          title: 'Demo session refreshed',
+          description: 'The storefront restored the seeded Ada Okafor customer session before continuing.',
+        });
+      });
+    }
+
+    const handleUnauthorized = () => {
+      clearStoredSession();
+      setSession(null);
+    };
+
+    try {
+      return await run(activeSession.accessToken, handleUnauthorized);
+    } catch (error) {
+      if (!isUnauthorizedApiError(error)) {
+        throw error;
+      }
+
+      clearStoredSession();
+      const refreshedSession = await getOrCreateDemoCustomerSession();
+      startTransition(() => {
+        setSession(refreshedSession);
+        setAuthNotice({
+          tone: 'success',
+          title: 'Demo session refreshed',
+          description: 'The customer session had expired, so the storefront signed in again automatically and retried the action.',
+        });
+      });
+
+      return run(refreshedSession.accessToken, handleUnauthorized);
+    }
+  }
+
   async function handlePreviewCart() {
     if (!cartItems.length) { setCartNotice({ tone: 'warning', title: 'Cart is empty', description: 'Add at least one product first.' }); setCartPreview(null); return; }
-    if (!session?.accessToken) { setCartNotice({ tone: 'warning', title: 'Session loading', description: 'Demo customer session still initialising.' }); return; }
     setIsPreviewingCart(true);
     try {
-      const client = createStorefrontClient(session.accessToken, () => { clearStoredSession(); setSession(null); });
-      const preview = await client.previewCart({ customerId: DEMO_STOREFRONT_CUSTOMER_ID, branchId: planner.branchId, items: cartItems });
+      const preview = await withCustomerSessionRetry((accessToken, onUnauthorized) => {
+        const client = createStorefrontClient(accessToken, onUnauthorized);
+        return client.previewCart({ customerId: DEMO_STOREFRONT_CUSTOMER_ID, branchId: planner.branchId, items: cartItems });
+      });
       startTransition(() => {
         setCartPreview(preview);
         setCartNotice({ tone: preview.containsPrescriptionItems ? 'warning' : 'success', title: preview.containsPrescriptionItems ? 'Rx items — pending review' : 'Cart validated', description: preview.containsPrescriptionItems ? 'Order will route to pending_review.' : 'Live stock and pricing confirmed.' });
@@ -496,11 +547,12 @@ export function StorefrontHome() {
 
   async function handleCheckout() {
     if (!cartItems.length) { setCheckoutNotice({ tone: 'warning', title: 'Cart is empty', description: 'Add products before checkout.' }); return; }
-    if (!session?.accessToken) { setCheckoutNotice({ tone: 'warning', title: 'Session loading', description: 'Demo customer session still initialising.' }); return; }
     setIsCheckingOut(true);
     try {
-      const client = createStorefrontClient(session.accessToken, () => { clearStoredSession(); setSession(null); });
-      const response = await client.checkout({ customerId: DEMO_STOREFRONT_CUSTOMER_ID, branchId: planner.branchId, items: cartItems });
+      const response = await withCustomerSessionRetry((accessToken, onUnauthorized) => {
+        const client = createStorefrontClient(accessToken, onUnauthorized);
+        return client.checkout({ customerId: DEMO_STOREFRONT_CUSTOMER_ID, branchId: planner.branchId, items: cartItems });
+      });
       startTransition(() => {
         setCartPreview(response.cart);
         setCartItems([]);

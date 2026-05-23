@@ -24,9 +24,15 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid authorization header');
     }
 
-    const payload = this.jwtService.verify<AuthenticatedUser>(token, {
-      secret: this.configService.getOrThrow<string>('auth.jwtSecret'),
-    });
+    let payload: AuthenticatedUser;
+
+    try {
+      payload = this.jwtService.verify<AuthenticatedUser>(token, {
+        secret: this.configService.getOrThrow<string>('auth.jwtSecret'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired bearer token');
+    }
 
     request.user = payload;
     return true;
