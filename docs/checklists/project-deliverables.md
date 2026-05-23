@@ -87,4 +87,5 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Populate `packages/api-contracts` with shared types or contracts consumed by the frontend apps.
 - [x] Add targeted end-to-end coverage for auth, branch scoping, orders, prescriptions, payments, and delivery.
 - [x] Add deployment and environment runbooks for `apps/web`, `apps/admin`, `apps/api`, and `apps/worker`.
+- [x] Add Render blueprint and all-Render deployment guidance for the monorepo services.
 - [x] Add release-readiness documentation for operational rollback, seeding, and smoke checks.

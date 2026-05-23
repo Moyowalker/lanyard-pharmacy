@@ -52,13 +52,13 @@ type StorefrontProductDetailProps = {
   initialServiceMode?: ServiceMode;
 };
 
-export function StorefrontProductDetail({ slug, initialBranchId, initialServiceMode = 'pickup' }: StorefrontProductDetailProps) {
-  const storedPlanner = readStoredPlanner() ?? DEFAULT_PLANNER;
+export function StorefrontProductDetail({ slug, initialBranchId, initialServiceMode }: StorefrontProductDetailProps) {
   const [branches, setBranches] = useState<BranchSummary[]>(fallbackBranches);
   const [catalog, setCatalog] = useState<CatalogProduct[]>(fallbackCatalogProducts);
-  const [session, setSession] = useState<PlatformSession | null>(() => readStoredSession());
-  const [branchId, setBranchId] = useState(initialBranchId ?? storedPlanner.branchId);
-  const [serviceMode, setServiceMode] = useState<ServiceMode>(initialServiceMode);
+  const [session, setSession] = useState<PlatformSession | null>(null);
+  const [hasHydratedStorage, setHasHydratedStorage] = useState(false);
+  const [branchId, setBranchId] = useState(initialBranchId ?? DEFAULT_PLANNER.branchId);
+  const [serviceMode, setServiceMode] = useState<ServiceMode>(initialServiceMode ?? DEFAULT_PLANNER.serviceMode);
   const [quantity, setQuantity] = useState('1');
   const [authNotice, setAuthNotice] = useState<FormFeedback | null>(null);
   const [catalogNotice, setCatalogNotice] = useState<FormFeedback | null>(null);
@@ -71,21 +71,43 @@ export function StorefrontProductDetail({ slug, initialBranchId, initialServiceM
   const publicClient = createStorefrontClient();
 
   useEffect(() => {
+    const storedPlanner = readStoredPlanner();
+
+    if (!initialBranchId && storedPlanner?.branchId) {
+      setBranchId(storedPlanner.branchId);
+    }
+
+    if (!initialServiceMode && storedPlanner?.serviceMode) {
+      setServiceMode(storedPlanner.serviceMode);
+    }
+
+    setHasHydratedStorage(true);
+  }, [initialBranchId, initialServiceMode]);
+
+  useEffect(() => {
+    if (!hasHydratedStorage) {
+      return;
+    }
+
     if (session) {
       persistSession(session);
       return;
     }
 
     clearStoredSession();
-  }, [session]);
+  }, [hasHydratedStorage, session]);
 
   useEffect(() => {
+    if (!hasHydratedStorage) {
+      return;
+    }
+
     persistPlanner({
       ...(readStoredPlanner() ?? DEFAULT_PLANNER),
       branchId,
       serviceMode,
     });
-  }, [branchId, serviceMode]);
+  }, [branchId, hasHydratedStorage, serviceMode]);
 
   useEffect(() => {
     let isCancelled = false;

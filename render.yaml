@@ -1,0 +1,115 @@
+services:
+  - type: web
+    runtime: node
+    name: lanyard-pharmacy-web
+    region: oregon
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @lanyard/web build
+    startCommand: pnpm --filter @lanyard/web start
+    healthCheckPath: /
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/web/**
+        - packages/api-contracts/**
+        - packages/ui/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - tsconfig.base.json
+        - turbo.json
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false
+
+  - type: web
+    runtime: node
+    name: lanyard-pharmacy-admin
+    region: oregon
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @lanyard/admin build
+    startCommand: pnpm --filter @lanyard/admin start
+    healthCheckPath: /
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/admin/**
+        - packages/api-contracts/**
+        - packages/ui/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - tsconfig.base.json
+        - turbo.json
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false
+
+  - type: web
+    runtime: node
+    name: lanyard-pharmacy-api
+    region: oregon
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @lanyard/api db:generate && pnpm --filter @lanyard/api build
+    preDeployCommand: pnpm --filter @lanyard/api db:deploy
+    startCommand: pnpm --filter @lanyard/api start:prod
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/api-contracts/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - tsconfig.base.json
+        - turbo.json
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lanyard-pharmacy-postgres
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: WORKFLOW_EVENT_MAX_ATTEMPTS
+        value: '3'
+      - key: CORS_ORIGIN
+        sync: false
+
+  - type: worker
+    runtime: node
+    name: lanyard-pharmacy-worker
+    region: oregon
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @lanyard/api db:generate && pnpm --filter @lanyard/worker build
+    startCommand: pnpm --filter @lanyard/worker start:prod
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/worker/**
+        - apps/api/prisma/**
+        - packages/api-contracts/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - tsconfig.base.json
+        - turbo.json
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lanyard-pharmacy-postgres
+          property: connectionString
+      - key: WORKFLOW_EVENT_RETRY_DELAY_SECONDS
+        value: '60'
+
+databases:
+  - name: lanyard-pharmacy-postgres
+    region: oregon
+    databaseName: lanyard_pharmacy
+    user: lanyard

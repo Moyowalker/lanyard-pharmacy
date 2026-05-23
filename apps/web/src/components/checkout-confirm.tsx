@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { startTransition, useEffect, useState } from 'react';
-import type { BranchSummary, CheckoutOrder } from '@lanyard/api-contracts/client';
+import type { BranchSummary, CheckoutOrder, PlatformSession } from '@lanyard/api-contracts/client';
 import {
   EmptyState,
   FeedbackNotice,
@@ -34,13 +34,23 @@ export function CheckoutConfirm() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
 
-  const [session] = useState(() => readStoredSession());
+  const [session, setSession] = useState<PlatformSession | null>(null);
+  const [hasHydratedSession, setHasHydratedSession] = useState(false);
   const [order, setOrder] = useState<CheckoutOrder | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setSession(readStoredSession());
+    setHasHydratedSession(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydratedSession) {
+      return;
+    }
+
     if (!orderId) {
       setIsLoading(false);
       setError('No order ID provided.');
@@ -74,7 +84,7 @@ export function CheckoutConfirm() {
     });
 
     return () => { isCancelled = true; };
-  }, [orderId, session?.accessToken]);
+  }, [hasHydratedSession, orderId, session?.accessToken]);
 
   const branchName = (branchId: string) => {
     const b = (branches.length ? branches : fallbackBranches).find((b) => b.id === branchId);

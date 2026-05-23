@@ -7,10 +7,12 @@ import { AppLogger } from './modules/observability/app-logger.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  const corsOrigin = configService.get<string | string[]>('app.corsOrigin') ?? '*';
+
   app.useLogger(app.get(AppLogger));
 
   app.enableCors({
-    origin: configService.get<string>('app.corsOrigin') ?? '*',
+    origin: corsOrigin,
   });
   app.enableShutdownHooks();
   app.setGlobalPrefix('api/v1');

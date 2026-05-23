@@ -74,7 +74,8 @@ function formatDateTime(value: string) {
 }
 
 export function CustomerAccount() {
-  const [session, setSession] = useState<PlatformSession | null>(() => readStoredSession());
+  const [session, setSession] = useState<PlatformSession | null>(null);
+  const [hasHydratedStorage, setHasHydratedStorage] = useState(false);
   const [branches, setBranches] = useState<BranchSummary[]>(fallbackBranches);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [orders, setOrders] = useState<CustomerOrderSummary[]>([]);
@@ -84,13 +85,21 @@ export function CustomerAccount() {
   const [dataNotice, setDataNotice] = useState<FormFeedback | null>(null);
 
   useEffect(() => {
+    setHasHydratedStorage(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydratedStorage) {
+      return;
+    }
+
     if (session) {
       persistSession(session);
       return;
     }
 
     clearStoredSession();
-  }, [session]);
+  }, [hasHydratedStorage, session]);
 
   useEffect(() => {
     let isCancelled = false;

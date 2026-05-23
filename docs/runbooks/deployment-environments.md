@@ -16,6 +16,65 @@ Use this order for platform-wide releases that touch the database or shared cont
 
 If only one app changed, you can deploy that app independently as long as its runtime dependencies are already compatible with the deployed API schema.
 
+## Render Blueprint
+
+The repository now includes a root `render.yaml` Blueprint for an all-Render deployment of the storefront, admin app, API, worker, and PostgreSQL.
+
+### Recommended All-Render Topology
+
+| Resource | Render type | Source |
+| --- | --- | --- |
+| Storefront | Web service | `apps/web` |
+| Admin | Web service | `apps/admin` |
+| API | Web service | `apps/api` |
+| Worker | Background worker | `apps/worker` |
+| PostgreSQL | Render Postgres | managed by `render.yaml` |
+
+### Initial Blueprint Sync Notes
+
+1. Create the Blueprint from the repository root so Render picks up `render.yaml`.
+2. Let Render provision the PostgreSQL instance first, then the API, worker, storefront, and admin services.
+3. When Render prompts for `NEXT_PUBLIC_API_BASE_URL`, enter the public API URL for the deployed API service.
+4. When Render prompts for `CORS_ORIGIN`, enter a comma-separated list of the storefront and admin public origins.
+5. If Render assigns different `*.onrender.com` slugs than the default service names in `render.yaml`, update `NEXT_PUBLIC_API_BASE_URL` and `CORS_ORIGIN` after the first sync and redeploy the affected services.
+
+For the default Blueprint service names in this repository, the expected values are:
+
+| Variable | Suggested value |
+| --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | `https://lanyard-pharmacy-api.onrender.com` |
+| `CORS_ORIGIN` | `https://lanyard-pharmacy-web.onrender.com,https://lanyard-pharmacy-admin.onrender.com` |
+
+### Render Dashboard Steps
+
+1. In Render, select `New` -> `Blueprint`.
+2. Connect the `Moyowalker/lanyard-pharmacy` repository and choose the `main` branch.
+3. Keep the Blueprint path as `render.yaml` at the repository root.
+4. Review the five resources Render detects:
+   - `lanyard-pharmacy-postgres`
+   - `lanyard-pharmacy-api`
+   - `lanyard-pharmacy-worker`
+   - `lanyard-pharmacy-web`
+   - `lanyard-pharmacy-admin`
+5. If you want lower latency for West Africa or Europe, update every resource region in `render.yaml` from `oregon` to `frankfurt` before the first sync so the entire stack stays co-located.
+6. Continue to environment variable prompts and enter the following values:
+
+| Service | Variable | Value |
+| --- | --- | --- |
+| `lanyard-pharmacy-web` | `NEXT_PUBLIC_API_BASE_URL` | `https://lanyard-pharmacy-api.onrender.com` |
+| `lanyard-pharmacy-admin` | `NEXT_PUBLIC_API_BASE_URL` | `https://lanyard-pharmacy-api.onrender.com` |
+| `lanyard-pharmacy-api` | `CORS_ORIGIN` | `https://lanyard-pharmacy-web.onrender.com,https://lanyard-pharmacy-admin.onrender.com` |
+
+7. Leave `JWT_SECRET` generation to Render; the Blueprint already requests a generated value.
+8. Create the Blueprint and wait for the first deploy wave to finish.
+9. If any service receives a different public slug than the default values above, update the affected environment variables in Render and redeploy the impacted services.
+10. Run the smoke checks after deployment:
+	- storefront `/`
+	- admin `/`
+	- API `/api/v1/health`
+	- API `/api/docs`
+	- worker service status and logs in the Render dashboard
+
 ## apps/web
 
 ### Purpose And Runtime
@@ -37,7 +96,7 @@ Reserve these names for the first production integration pass instead of inventi
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | no | Planned base URL for API calls once the storefront consumes live backend data. |
+| `NEXT_PUBLIC_API_BASE_URL` | no | Public base URL for the deployed API. Required for any non-local deployment, including Render. |
 
 ### Deployment Procedure
 
@@ -67,7 +126,7 @@ Reserve these names for the first production integration pass:
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | no | Planned base URL for API calls once the admin UI consumes live backend data. |
+| `NEXT_PUBLIC_API_BASE_URL` | no | Public base URL for the deployed API. Required for any non-local deployment, including Render. |
 
 ### Deployment Procedure
 
@@ -97,7 +156,7 @@ Reserve these names for the first production integration pass:
 | --- | --- | --- | --- |
 | `NODE_ENV` | yes | `development` | Use `production` in deployed environments. |
 | `PORT` | no | `4000` | API listener port. |
-| `CORS_ORIGIN` | yes | `*` | Lock this down per environment before public exposure. |
+| `CORS_ORIGIN` | yes | `*` | Lock this down per environment before public exposure. Accepts a comma-separated list for multiple frontend origins. |
 | `JWT_SECRET` | yes | none in production | Must be at least 16 characters. Do not reuse the local demo default. |
 | `JWT_ACCESS_TTL` | no | `15m` | JWT access token lifetime. |
 | `DATABASE_URL` | yes | none in production | PostgreSQL connection string with `?schema=public`. |
@@ -117,6 +176,7 @@ Reserve these names for the first production integration pass:
 ### Environment Notes
 
 - `apps/api/.env.example` is the source-controlled local template.
+- `CORS_ORIGIN` can now be a single origin or a comma-separated list, which is useful when the storefront and admin are deployed as separate Render services.
 - The current seed script is destructive and resets domain tables; do not run it in production.
 - Roll out API schema changes before deploying the worker so both runtimes agree on the outbox and audit schema.
 
@@ -155,5 +215,6 @@ Reserve these names for the first production integration pass:
 ### Environment Notes
 
 - The worker shares the API database and depends on the same Prisma migrations.
+- The Render Blueprint deploys the worker as a background worker, so health validation is service-state and log based instead of a public health-check URL.
 - Queue health is surfaced through both the worker health endpoint and the API health endpoint.
 - Use the same release window as the API whenever queue semantics or workflow event payloads change.

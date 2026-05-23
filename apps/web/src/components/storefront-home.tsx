@@ -299,16 +299,17 @@ export function StorefrontHome() {
   const [isLoadingBranches, setIsLoadingBranches] = useState(true);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const [hasHydratedStorage, setHasHydratedStorage] = useState(false);
   const [branchNotice, setBranchNotice] = useState<FormFeedback | null>(null);
   const [catalogNotice, setCatalogNotice] = useState<FormFeedback | null>(null);
   const [authNotice, setAuthNotice] = useState<FormFeedback | null>(null);
   const [issues, setIssues] = useState<FormIssue[]>([]);
   const [feedback, setFeedback] = useState<FormFeedback | null>(null);
-  const [planner, setPlanner] = useState<BranchPlanner>(() => readStoredPlanner() ?? DEFAULT_PLANNER);
-  const [session, setSession] = useState<PlatformSession | null>(() => readStoredSession());
+  const [planner, setPlanner] = useState<BranchPlanner>(DEFAULT_PLANNER);
+  const [session, setSession] = useState<PlatformSession | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [cartItems, setCartItems] = useState<StorefrontCartItem[]>(() => readStoredCart());
+  const [cartItems, setCartItems] = useState<StorefrontCartItem[]>([]);
   const [cartNotice, setCartNotice] = useState<FormFeedback | null>(null);
   const [cartPreview, setCartPreview] = useState<CartSummary | null>(null);
   const [checkoutNotice, setCheckoutNotice] = useState<FormFeedback | null>(null);
@@ -325,9 +326,48 @@ export function StorefrontHome() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => { persistPlanner(planner); }, [planner]);
-  useEffect(() => { persistCart(cartItems); }, [cartItems]);
-  useEffect(() => { if (session) { persistSession(session); } else { clearStoredSession(); } }, [session]);
+  useEffect(() => {
+    const storedPlanner = readStoredPlanner();
+    const storedCart = readStoredCart();
+
+    if (storedPlanner) {
+      setPlanner(storedPlanner);
+    }
+
+    if (storedCart.length > 0) {
+      setCartItems(storedCart);
+    }
+
+    setHasHydratedStorage(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasHydratedStorage) {
+      return;
+    }
+
+    persistPlanner(planner);
+  }, [hasHydratedStorage, planner]);
+
+  useEffect(() => {
+    if (!hasHydratedStorage) {
+      return;
+    }
+
+    persistCart(cartItems);
+  }, [cartItems, hasHydratedStorage]);
+
+  useEffect(() => {
+    if (!hasHydratedStorage) {
+      return;
+    }
+
+    if (session) {
+      persistSession(session);
+    } else {
+      clearStoredSession();
+    }
+  }, [hasHydratedStorage, session]);
 
   useEffect(() => {
     let isCancelled = false;
