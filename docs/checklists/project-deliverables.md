@@ -45,6 +45,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Build customer support views for customer history, communication context, and issue handling.
 - [x] Build audit and notification monitoring views for internal operations.
 - [x] Add admin catalog product creation flow so new products can be created and managed from the admin app.
+- [x] Add explicit admin sign-in and sign-out controls with API connection diagnostics in the admin shell.
 
 ## Backend Deliverables
 

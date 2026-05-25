@@ -44,6 +44,11 @@ type AdminHandoffForm = {
   ownerEmail: string;
 };
 
+type AdminLoginForm = {
+  email: string;
+  password: string;
+};
+
 type NavDefinition = {
   label: string;
   href: string;
@@ -90,6 +95,7 @@ const fallbackBranches: BranchSummary[] = [
 const publicAdminClient = createPlatformApiClient({
   baseUrl: resolveApiBaseUrl(),
 });
+const adminApiBaseUrl = resolveApiBaseUrl();
 
 const queueRows = [
   {
@@ -284,6 +290,8 @@ export function AdminHome() {
   const [branchNotice, setBranchNotice] = useState<FormFeedback | null>(null);
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [isLoadingBranches, setIsLoadingBranches] = useState(true);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [loginForm, setLoginForm] = useState<AdminLoginForm>(DEMO_ADMIN_LOGIN);
 
   useEffect(() => {
     if (session) {
@@ -402,6 +410,58 @@ export function AdminHome() {
   const activeBranch = branches.find((branch) => branch.id === selectedBranchId) ?? branches[0] ?? null;
   const visibleNavItems = getVisibleNavItems(session?.user.roles ?? [], activeBranch?.name ?? 'branch pending', workerHealth.alerts.length);
 
+  async function handleManualSignIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const email = loginForm.email.trim();
+    const password = loginForm.password;
+
+    if (!email || !password) {
+      setAuthNotice({
+        tone: 'warning',
+        title: 'Missing credentials',
+        description: 'Provide both email and password before signing in.',
+      });
+      return;
+    }
+
+    setIsSigningIn(true);
+
+    try {
+      const loginResponse = await publicAdminClient.login({ email, password });
+      const nextSession = createPlatformSession(loginResponse);
+
+      startTransition(() => {
+        setSession(nextSession);
+        setAuthNotice({
+          tone: 'success',
+          title: 'Admin signed in',
+          description: 'Session has been restored and authenticated admin features are now available.',
+        });
+      });
+    } catch {
+      startTransition(() => {
+        setAuthNotice({
+          tone: 'danger',
+          title: 'Sign-in failed',
+          description: `Could not authenticate against ${adminApiBaseUrl}. Verify NEXT_PUBLIC_API_BASE_URL and API CORS settings.`,
+        });
+      });
+    } finally {
+      setIsSigningIn(false);
+    }
+  }
+
+  function handleSignOut() {
+    clearStoredAdminSession();
+    setSession(null);
+    setAuthNotice({
+      tone: 'neutral',
+      title: 'Signed out',
+      description: 'Your admin session has been removed from this browser.',
+    });
+  }
+
   function updateForm<Key extends keyof AdminHandoffForm>(field: Key, value: AdminHandoffForm[Key]) {
     setForm((current) => ({
       ...current,
@@ -451,6 +511,9 @@ export function AdminHome() {
       userRole={session?.user.roles[0] ?? 'operator'}
       actions={
         <>
+          {session ? (
+            <Button size="sm" variant="ghost" onClick={handleSignOut}>Sign out</Button>
+          ) : null}
           <StatusBadge tone="danger" dot>{workerHealth.metrics.deadLetterCount} dead letter</StatusBadge>
           <StatusBadge tone="neutral" dot>{activeBranch?.name ?? 'Branch pending'}</StatusBadge>
         </>
@@ -493,10 +556,38 @@ export function AdminHome() {
               </div>
             </div>
           ) : !isAuthenticating ? (
-            <UnauthorizedState
-              title="Session unavailable"
-              description="The seeded operator session could not be restored."
-            />
+            <div style={{ display: 'grid', gap: '0.875rem' }}>
+              <UnauthorizedState
+                title="Session unavailable"
+                description="The seeded operator session could not be restored. Sign in manually to continue."
+              />
+
+              <form onSubmit={(event) => void handleManualSignIn(event)} style={{ display: 'grid', gap: '0.75rem' }}>
+                <Field label="Admin email">
+                  <TextInput
+                    value={loginForm.email}
+                    onChange={(event) => setLoginForm((current) => ({ ...current, email: event.target.value }))}
+                    placeholder="admin@lanyardpharmacy.com"
+                  />
+                </Field>
+                <Field label="Password">
+                  <TextInput
+                    type="password"
+                    value={loginForm.password}
+                    onChange={(event) => setLoginForm((current) => ({ ...current, password: event.target.value }))}
+                    placeholder="Enter admin password"
+                  />
+                </Field>
+
+                <div style={{ fontSize: '0.8125rem', color: '#64748b' }}>
+                  API base: {adminApiBaseUrl}
+                </div>
+
+                <Button type="submit" disabled={isSigningIn}>
+                  {isSigningIn ? 'Signing in…' : 'Sign in'}
+                </Button>
+              </form>
+            </div>
           ) : null}
         </Panel>
 
