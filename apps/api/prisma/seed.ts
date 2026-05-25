@@ -1,6 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import { randomBytes, scryptSync } from 'crypto';
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
 
 export async function seedDatabase(prisma: PrismaClient) {
+  await prisma.platformUser.deleteMany();
   await prisma.notificationDeliveryAttempt.deleteMany();
   await prisma.workflowEvent.deleteMany();
   await prisma.auditEvent.deleteMany();
@@ -217,6 +225,41 @@ export async function seedDatabase(prisma: PrismaClient) {
         inventoryBatchId: 'inv-pan-ex-airport',
         productId: 'prod-panadol-extra',
         quantity: 1,
+      },
+    ],
+  });
+
+  await prisma.platformUser.createMany({
+    data: [
+      {
+        id: 'usr-admin-001',
+        firstName: 'Platform',
+        lastName: 'Admin',
+        email: 'admin@lanyardpharmacy.com',
+        passwordHash: hashPassword('Admin123!'),
+        roles: ['super_admin'],
+        branchIds: ['branch-main', 'branch-airport'],
+        isActive: true,
+      },
+      {
+        id: 'usr-pharm-001',
+        firstName: 'Lead',
+        lastName: 'Pharmacist',
+        email: 'pharmacist@lanyardpharmacy.com',
+        passwordHash: hashPassword('Pharmacy123!'),
+        roles: ['pharmacist'],
+        branchIds: ['branch-main'],
+        isActive: true,
+      },
+      {
+        id: 'cust-100',
+        firstName: 'Ada',
+        lastName: 'Okafor',
+        email: 'ada@example.com',
+        passwordHash: hashPassword('Customer123!'),
+        roles: ['customer'],
+        branchIds: [],
+        isActive: true,
       },
     ],
   });

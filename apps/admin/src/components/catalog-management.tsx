@@ -28,6 +28,7 @@ const navItems = [
   { label: 'Orders', href: '/orders', active: false },
   { label: 'Prescriptions', href: '/prescriptions', active: false },
   { label: 'Customers', href: '/customers', active: false },
+  { label: 'Users', href: '/users', active: false },
   { label: 'Audit', href: '/audit', active: false },
 ];
 

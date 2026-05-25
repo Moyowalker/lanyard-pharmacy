@@ -239,6 +239,38 @@ export type UpdateOrderStatusRequest = {
   status: OrderStatus;
 };
 
+export type PlatformUserRecord = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  roles: PlatformRole[];
+  branchIds: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatePlatformUserRequest = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  roles: PlatformRole[];
+  branchIds: string[];
+  isActive?: boolean;
+};
+
+export type UpdatePlatformUserRequest = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
+  roles?: PlatformRole[];
+  branchIds?: string[];
+  isActive?: boolean;
+};
+
 export type ApiClientFetch = (input: string, init?: {
   method?: string;
   headers?: Record<string, string>;
@@ -384,6 +416,12 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       available
         ? request<void>(`/api/v1/catalog/products/${productId}/branches/${branchId}`, { method: 'PUT' })
         : request<void>(`/api/v1/catalog/products/${productId}/branches/${branchId}`, { method: 'DELETE' }),
+    // Admin user management
+    listPlatformUsers: () => request<PlatformUserRecord[]>('/api/v1/users'),
+    createPlatformUser: (payload: CreatePlatformUserRequest) =>
+      request<PlatformUserRecord>('/api/v1/users', { method: 'POST', body: payload }),
+    updatePlatformUser: (userId: string, payload: UpdatePlatformUserRequest) =>
+      request<PlatformUserRecord>(`/api/v1/users/${userId}`, { method: 'PATCH', body: payload }),
     // Audit & notifications
     listAuditEvents: (limit?: number) =>
       request<AuditEventRecord[]>(`/api/v1/audit/events${limit ? `?limit=${limit}` : ''}`),

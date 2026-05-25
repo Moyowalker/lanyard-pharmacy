@@ -46,6 +46,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Build audit and notification monitoring views for internal operations.
 - [x] Add admin catalog product creation flow so new products can be created and managed from the admin app.
 - [x] Add explicit admin sign-in and sign-out controls with API connection diagnostics in the admin shell.
+- [x] Build admin user management screens for creating, updating, and activating or deactivating operator accounts.
 
 ## Backend Deliverables
 
@@ -73,6 +74,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Add payment attempt creation, capture, failure handling, and reconciliation workflows.
 - [x] Add delivery assignment and delivery-status transition workflows.
 - [x] Add catalog product creation API workflow with branch availability assignment.
+- [x] Replace demo-only identity login with database-backed operator users and user-management APIs.
 
 ### Background Processing And Operations
 

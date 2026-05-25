@@ -102,6 +102,21 @@ model Customer {
   @@map("customers")
 }
 
+model PlatformUser {
+  id           String   @id @db.VarChar(64)
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  roles        String[] @default([])
+  branchIds    String[] @default([]) @map("branch_ids")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_users")
+}
+
 model Product {
   id                   String           @id @db.VarChar(64)
   name                 String

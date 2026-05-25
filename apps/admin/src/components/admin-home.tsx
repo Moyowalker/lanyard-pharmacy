@@ -244,6 +244,11 @@ function getVisibleNavItems(roles: PlatformRole[], activeBranchLabel: string, al
       roles: ['pharmacist', 'support_admin', 'super_admin'],
     },
     {
+      label: 'Users',
+      href: '/users',
+      roles: ['super_admin'],
+    },
+    {
       label: 'Audit',
       href: '/audit',
       roles: ['pharmacist', 'support_admin', 'super_admin'],

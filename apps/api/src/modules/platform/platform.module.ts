@@ -14,6 +14,7 @@ import { ObservabilityModule } from '../observability/observability.module';
 import { OrdersModule } from '../orders/orders.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { PrescriptionsModule } from '../prescriptions/prescriptions.module';
+import { UsersModule } from '../users/users.module';
 import { appConfig } from '../../config/app.config';
 import { validateEnv } from '../../config/env.validation';
 
@@ -36,6 +37,7 @@ import { validateEnv } from '../../config/env.validation';
     PrescriptionsModule,
     PaymentsModule,
     DeliveryModule,
+    UsersModule,
     NotificationsModule,
     BranchesModule,
     AuditModule,

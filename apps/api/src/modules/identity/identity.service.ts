@@ -1,59 +1,29 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { PlatformUsersRepository } from '../../database/repositories/platform-users.repository';
 import type { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 import type { LoginDto } from './dto/login.dto';
-
-type DemoUserRecord = {
-  id: string;
-  email: string;
-  password: string;
-  roles: AuthenticatedUser['roles'];
-  branchIds: string[];
-};
-
-const DEMO_USERS: DemoUserRecord[] = [
-  {
-    id: 'cust-100',
-    email: 'ada@example.com',
-    password: 'Customer123!',
-    roles: ['customer'],
-    branchIds: [],
-  },
-  {
-    id: 'staff-001',
-    email: 'pharmacist@lanyardpharmacy.com',
-    password: 'Pharmacy123!',
-    roles: ['pharmacist'],
-    branchIds: ['branch-main'],
-  },
-  {
-    id: 'admin-001',
-    email: 'admin@lanyardpharmacy.com',
-    password: 'Admin123!',
-    roles: ['super_admin'],
-    branchIds: ['branch-main', 'branch-airport'],
-  },
-];
+import { verifyPassword } from './password-hash';
 
 @Injectable()
 export class IdentityService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly platformUsersRepository: PlatformUsersRepository,
+  ) {}
 
-  login(credentials: LoginDto) {
-    const user = DEMO_USERS.find(
-      (candidate) =>
-        candidate.email.toLowerCase() === credentials.email.toLowerCase() &&
-        candidate.password === credentials.password,
-    );
+  async login(credentials: LoginDto) {
+    const normalizedEmail = credentials.email.trim().toLowerCase();
+    const user = await this.platformUsersRepository.findByEmail(normalizedEmail);
 
-    if (!user) {
+    if (!user || !user.isActive || !verifyPassword(credentials.password, user.passwordHash)) {
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const payload: AuthenticatedUser = {
       sub: user.id,
       email: user.email,
-      roles: user.roles,
+      roles: user.roles as AuthenticatedUser['roles'],
       branchIds: user.branchIds,
     };
 

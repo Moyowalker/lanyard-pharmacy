@@ -177,6 +177,7 @@ Reserve these names for the first production integration pass:
 
 - `apps/api/.env.example` is the source-controlled local template.
 - `CORS_ORIGIN` can now be a single origin or a comma-separated list, which is useful when the storefront and admin are deployed as separate Render services.
+- The `platform_users` migration bootstraps default admin and pharmacist accounts for first-time access (`admin@lanyardpharmacy.com` / `Admin123!`, `pharmacist@lanyardpharmacy.com` / `Pharmacy123!`). Rotate these credentials immediately after first production login.
 - The current seed script is destructive and resets domain tables; do not run it in production.
 - Roll out API schema changes before deploying the worker so both runtimes agree on the outbox and audit schema.
 
