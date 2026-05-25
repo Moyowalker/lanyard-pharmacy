@@ -144,7 +144,7 @@ const initialCreateProductForm: CreateProductForm = {
   branchIds: [],
 };
 
-function validateCreateProductForm(form: CreateProductForm): FormIssue[] {
+function validateCreateProductForm(form: CreateProductForm, availableBranchCount: number): FormIssue[] {
   const issues: FormIssue[] = [];
   const priceNgn = Number.parseFloat(form.priceNgn);
 
@@ -164,7 +164,7 @@ function validateCreateProductForm(form: CreateProductForm): FormIssue[] {
     issues.push({ field: 'priceNgn', message: 'Enter a positive price in naira.' });
   }
 
-  if (form.branchIds.length === 0) {
+  if (availableBranchCount > 0 && form.branchIds.length === 0) {
     issues.push({ field: 'branchIds', message: 'Select at least one branch for the initial rollout.' });
   }
 
@@ -259,7 +259,7 @@ export function CatalogManagement() {
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const issues = validateCreateProductForm(createForm);
+    const issues = validateCreateProductForm(createForm, branches.length);
     setCreateIssues(issues);
 
     if (issues.length > 0) {
@@ -300,7 +300,9 @@ export function CatalogManagement() {
         setPageNotice({
           tone: 'success',
           title: 'Product created',
-          description: `${createdProduct.name} is now available in ${createdProduct.branchIds.length} branch${createdProduct.branchIds.length === 1 ? '' : 'es'}.`,
+          description: createdProduct.branchIds.length > 0
+            ? `${createdProduct.name} is now available in ${createdProduct.branchIds.length} branch${createdProduct.branchIds.length === 1 ? '' : 'es'}.`
+            : `${createdProduct.name} was created without branch availability. Assign branches after locations are configured.`,
         });
       });
     } catch {
@@ -396,8 +398,16 @@ export function CatalogManagement() {
               </div>
               <div style={helperCardStyle}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#2563eb' }}>Coverage</span>
-                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#0f172a' }}>{createForm.branchIds.length} branch{createForm.branchIds.length === 1 ? '' : 'es'} selected</span>
-                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Choose where the product launches first.</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#0f172a' }}>
+                  {branches.length === 0
+                    ? 'No branches configured'
+                    : `${createForm.branchIds.length} branch${createForm.branchIds.length === 1 ? '' : 'es'} selected`}
+                </span>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>
+                  {branches.length === 0
+                    ? 'Create the catalog item now and assign availability later.'
+                    : 'Choose where the product launches first.'}
+                </span>
               </div>
               <div style={helperCardStyle}>
                 <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#2563eb' }}>Prescription</span>
@@ -483,21 +493,27 @@ export function CatalogManagement() {
                 <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#0f172a' }}>Initial branch availability</span>
                 <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Select the branches that should carry this product immediately.</span>
               </div>
-              <div style={chipGroupStyle}>
-                {branches.map((branch) => {
-                  const selected = createForm.branchIds.includes(branch.id);
-                  return (
-                    <button
-                      key={branch.id}
-                      type="button"
-                      style={createChipStyle(selected, '#0f766e')}
-                      onClick={() => toggleCreateBranch(branch.id)}
-                    >
-                      {branch.name}
-                    </button>
-                  );
-                })}
-              </div>
+              {branches.length > 0 ? (
+                <div style={chipGroupStyle}>
+                  {branches.map((branch) => {
+                    const selected = createForm.branchIds.includes(branch.id);
+                    return (
+                      <button
+                        key={branch.id}
+                        type="button"
+                        style={createChipStyle(selected, '#0f766e')}
+                        onClick={() => toggleCreateBranch(branch.id)}
+                      >
+                        {branch.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>
+                  No branches are configured yet. You can still create the product now and assign availability after branches are added.
+                </span>
+              )}
               {getFieldIssue(createIssues, 'branchIds') ? (
                 <span style={{ color: '#b91c1c', fontSize: '0.8125rem', fontWeight: 500 }}>{getFieldIssue(createIssues, 'branchIds')}</span>
               ) : null}

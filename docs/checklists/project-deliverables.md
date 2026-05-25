@@ -51,6 +51,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Refresh admin data-entry form layouts for catalog and user management so controls align consistently across desktop and mobile.
 - [x] Correct admin user-management page alignment so create-user and directory panels render full-width without dead grid columns.
 - [x] Center admin catalog and user-management content blocks so form panels are horizontally balanced on wide screens.
+- [x] Allow admin catalog product creation when no branches are configured, with clear empty-state guidance.
 
 ## Backend Deliverables
 

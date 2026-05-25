@@ -28,7 +28,7 @@ export class CatalogService {
   }
 
   async createProduct(input: CreateCatalogProductDto, actor: AuthenticatedUser) {
-    const normalizedInput = this.normalizeCreateInput(input);
+    const normalizedInput = await this.normalizeCreateInput(input);
 
     return this.database.transaction(async (client) => {
       try {
@@ -71,7 +71,7 @@ export class CatalogService {
     });
   }
 
-  private normalizeCreateInput(input: CreateCatalogProductDto) {
+  private async normalizeCreateInput(input: CreateCatalogProductDto) {
     const name = this.requireText(input.name, 'name');
     const category = this.requireText(input.category, 'category');
     const dosageForm = this.requireText(input.dosageForm, 'dosageForm');
@@ -79,7 +79,11 @@ export class CatalogService {
       .sort((left, right) => left.localeCompare(right));
 
     if (branchIds.length === 0) {
-      throw new BadRequestException('Catalog product must be assigned to at least one branch');
+      const configuredBranchCount = await this.database.branch.count();
+
+      if (configuredBranchCount > 0) {
+        throw new BadRequestException('Catalog product must be assigned to at least one branch');
+      }
     }
 
     return {

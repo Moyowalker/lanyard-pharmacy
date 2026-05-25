@@ -448,6 +448,63 @@ describe('Workflow writes (db)', () => {
       ]);
   });
 
+  it('creates a catalog product without branch assignments when no branches are configured', async () => {
+    await prisma.notificationDeliveryAttempt.deleteMany();
+    await prisma.workflowEvent.deleteMany();
+    await prisma.auditEvent.deleteMany();
+    await prisma.lowStockAlert.deleteMany();
+    await prisma.deliveryJob.deleteMany();
+    await prisma.inventoryReservation.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.paymentAttempt.deleteMany();
+    await prisma.prescription.deleteMany();
+    await prisma.inventoryBatch.deleteMany();
+    await prisma.branchProduct.deleteMany();
+    await prisma.pharmacyOrder.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.branch.deleteMany();
+
+    const loginResponse = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({
+        email: 'admin@lanyardpharmacy.com',
+        password: 'Admin123!',
+      })
+      .expect(201);
+
+    const headers = {
+      Authorization: `Bearer ${loginResponse.body.accessToken}`,
+    };
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/api/v1/catalog/products')
+      .set(headers)
+      .send({
+        name: 'Vitamin C 1000mg',
+        category: 'Vitamins',
+        dosageForm: 'tablet',
+        price: 3500,
+        requiresPrescription: false,
+        branchIds: [],
+      })
+      .expect(201);
+
+    expect(createResponse.body.name).toBe('Vitamin C 1000mg');
+    expect(createResponse.body.branchIds).toEqual([]);
+
+    const savedProduct = await prisma.product.findUniqueOrThrow({
+      where: {
+        id: createResponse.body.id,
+      },
+      include: {
+        branchProducts: true,
+      },
+    });
+
+    expect(savedProduct.name).toBe('Vitamin C 1000mg');
+    expect(savedProduct.branchProducts).toHaveLength(0);
+  });
+
   it('creates payment attempts, handles failed retries, and reconciles captured payments into processing', async () => {
     const loginResponse = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
