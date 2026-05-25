@@ -286,10 +286,45 @@ export type PlatformApiClientOptions = {
 
 export const PLATFORM_SESSION_STORAGE_KEY = 'lanyard.platform.session';
 
-export function resolveApiBaseUrl(value?: string) {
-  const configuredValue = value ?? (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_API_BASE_URL : undefined);
+function inferRenderApiBaseUrl() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
 
-  return (configuredValue ?? 'http://localhost:4000').replace(/\/$/, '');
+  const { hostname, protocol } = window.location;
+
+  if (!hostname.endsWith('.onrender.com')) {
+    return null;
+  }
+
+  const serviceName = hostname.replace(/\.onrender\.com$/i, '');
+  const inferredServiceName = serviceName
+    .replace(/-admin$/i, '-api')
+    .replace(/-web$/i, '-api');
+
+  if (inferredServiceName === serviceName) {
+    return null;
+  }
+
+  return `${protocol}//${inferredServiceName}.onrender.com`;
+}
+
+function normalizeApiBaseUrl(value: string | null | undefined) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  return normalizedValue.length > 0 ? normalizedValue : null;
+}
+
+export function resolveApiBaseUrl(value?: string) {
+  const configuredValue = normalizeApiBaseUrl(
+    value ?? (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_API_BASE_URL : undefined),
+  );
+  const browserFallback = inferRenderApiBaseUrl();
+
+  return (configuredValue ?? browserFallback ?? 'http://localhost:4000').replace(/\/$/, '');
 }
 
 export function createPlatformSession(loginResponse: LoginResponse, storedAt = new Date().toISOString()): PlatformSession {

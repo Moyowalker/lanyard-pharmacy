@@ -92,10 +92,6 @@ const fallbackBranches: BranchSummary[] = [
   { id: 'branch-main', name: 'Main Branch', city: 'Lagos', supportsDelivery: true },
   { id: 'branch-airport', name: 'Airport Branch', city: 'Lagos', supportsDelivery: true },
 ];
-const publicAdminClient = createPlatformApiClient({
-  baseUrl: resolveApiBaseUrl(),
-});
-const adminApiBaseUrl = resolveApiBaseUrl();
 
 const queueRows = [
   {
@@ -277,6 +273,10 @@ function getVisibleNavItems(roles: PlatformRole[], activeBranchLabel: string, al
 }
 
 export function AdminHome() {
+  const adminApiBaseUrl = resolveApiBaseUrl();
+  const publicAdminClient = createPlatformApiClient({
+    baseUrl: adminApiBaseUrl,
+  });
   const [session, setSession] = useState<PlatformSession | null>(() => readStoredAdminSession());
   const [branches, setBranches] = useState<BranchSummary[]>(fallbackBranches);
   const [selectedBranchId, setSelectedBranchId] = useState<string>(() => readStoredBranchId() ?? fallbackBranches[0]?.id ?? '');

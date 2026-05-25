@@ -35,6 +35,7 @@ The repository now includes a root `render.yaml` Blueprint for an all-Render dep
 1. Create the Blueprint from the repository root so Render picks up `render.yaml`.
 2. Let Render provision the PostgreSQL instance first, then the API, worker, storefront, and admin services.
 3. When Render prompts for `NEXT_PUBLIC_API_BASE_URL`, enter the public API URL for the deployed API service.
+4. The storefront and admin now infer `https://<shared-slug>-api.onrender.com` when they run on Render with the default `-web` or `-admin` service names and `NEXT_PUBLIC_API_BASE_URL` is missing, but keep the variable set explicitly for custom domains or non-standard slugs.
 4. When Render prompts for `CORS_ORIGIN`, enter a comma-separated list of the storefront and admin public origins.
 5. If Render assigns different `*.onrender.com` slugs than the default service names in `render.yaml`, update `NEXT_PUBLIC_API_BASE_URL` and `CORS_ORIGIN` after the first sync and redeploy the affected services.
 
@@ -96,7 +97,7 @@ Reserve these names for the first production integration pass instead of inventi
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | no | Public base URL for the deployed API. Required for any non-local deployment, including Render. |
+| `NEXT_PUBLIC_API_BASE_URL` | no | Public base URL for the deployed API. Required for any non-local deployment, including Render, unless the app is using the default Render `-web` to `-api` slug inference fallback. |
 
 ### Deployment Procedure
 
@@ -126,7 +127,7 @@ Reserve these names for the first production integration pass:
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | no | Public base URL for the deployed API. Required for any non-local deployment, including Render. |
+| `NEXT_PUBLIC_API_BASE_URL` | no | Public base URL for the deployed API. Required for any non-local deployment, including Render, unless the app is using the default Render `-admin` to `-api` slug inference fallback. |
 
 ### Deployment Procedure
 

@@ -13,10 +13,14 @@ import {
   LoadingState,
   Panel,
   ResponsiveGrid,
+  SelectInput,
   StatusBadge,
   TextInput,
   UnauthorizedState,
+  ValidationSummary,
+  getFieldIssue,
   type FormFeedback,
+  type FormIssue,
 } from '@lanyard/ui';
 import { createAdminApiClient, readAdminSession } from './admin-session';
 
@@ -46,6 +50,61 @@ function categoryColor(cat: string) {
   return categoryColors[cat] ?? '#94a3b8';
 }
 
+const formGridStyle = {
+  display: 'grid',
+  gap: '1rem',
+} as const;
+
+const pairedFieldGridStyle = {
+  display: 'grid',
+  gap: '0.75rem',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(12rem, 1fr))',
+} as const;
+
+const sectionCardStyle = {
+  display: 'grid',
+  gap: '0.75rem',
+  padding: '1rem',
+  borderRadius: '0.875rem',
+  border: '1px solid #e2e8f0',
+  background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+} as const;
+
+const helperCardGridStyle = {
+  display: 'grid',
+  gap: '0.75rem',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(10rem, 1fr))',
+} as const;
+
+const helperCardStyle = {
+  display: 'grid',
+  gap: '0.2rem',
+  padding: '0.9rem 1rem',
+  borderRadius: '0.875rem',
+  border: '1px solid #dbeafe',
+  background: 'linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%)',
+} as const;
+
+const chipGroupStyle = {
+  display: 'flex',
+  gap: '0.45rem',
+  flexWrap: 'wrap',
+} as const;
+
+function createChipStyle(selected: boolean, color: string) {
+  return {
+    borderRadius: '999px',
+    padding: '0.45rem 0.8rem',
+    fontSize: '0.8125rem',
+    fontWeight: 600,
+    border: `1px solid ${selected ? color : '#dbe2ea'}`,
+    background: selected ? color : '#ffffff',
+    color: selected ? '#ffffff' : '#0f172a',
+    boxShadow: selected ? `0 8px 18px ${color}2b` : 'none',
+    cursor: 'pointer',
+  } as const;
+}
+
 type CreateProductForm = {
   name: string;
   slug: string;
@@ -66,15 +125,43 @@ const initialCreateProductForm: CreateProductForm = {
   branchIds: [],
 };
 
+function validateCreateProductForm(form: CreateProductForm): FormIssue[] {
+  const issues: FormIssue[] = [];
+  const priceNgn = Number.parseFloat(form.priceNgn);
+
+  if (!form.name.trim()) {
+    issues.push({ field: 'name', message: 'Enter the shopper-facing product name.' });
+  }
+
+  if (!form.category.trim()) {
+    issues.push({ field: 'category', message: 'Provide a category so the catalog can be filtered clearly.' });
+  }
+
+  if (!form.dosageForm.trim()) {
+    issues.push({ field: 'dosageForm', message: 'Provide the dosage form shown to customers.' });
+  }
+
+  if (!form.priceNgn.trim() || !Number.isFinite(priceNgn) || priceNgn <= 0) {
+    issues.push({ field: 'priceNgn', message: 'Enter a positive price in naira.' });
+  }
+
+  if (form.branchIds.length === 0) {
+    issues.push({ field: 'branchIds', message: 'Select at least one branch for the initial rollout.' });
+  }
+
+  return issues;
+}
+
 export function CatalogManagement() {
   const [session] = useState(() => readAdminSession());
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [notice, setNotice] = useState<FormFeedback | null>(null);
+  const [pageNotice, setPageNotice] = useState<FormFeedback | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [createForm, setCreateForm] = useState<CreateProductForm>(initialCreateProductForm);
+  const [createIssues, setCreateIssues] = useState<FormIssue[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
@@ -98,7 +185,7 @@ export function CatalogManagement() {
     }).catch(() => {
       if (!isCancelled) {
         startTransition(() => {
-          setNotice({ tone: 'warning', title: 'Data unavailable', description: 'Could not load catalog or branch data. Is the backend running?' });
+          setPageNotice({ tone: 'warning', title: 'Data unavailable', description: 'Could not load catalog or branch data from the live API.' });
           setIsLoading(false);
         });
       }
@@ -141,26 +228,30 @@ export function CatalogManagement() {
         branchIds: [...current.branchIds, branchId],
       };
     });
+
+    setCreateIssues((current) => current.filter((issue) => issue.field !== 'branchIds'));
+  }
+
+  function updateCreateForm<Key extends keyof CreateProductForm>(field: Key, value: CreateProductForm[Key]) {
+    setCreateForm((current) => ({ ...current, [field]: value }));
+    setCreateIssues((current) => current.filter((issue) => issue.field !== field));
   }
 
   async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    const issues = validateCreateProductForm(createForm);
+    setCreateIssues(issues);
+
+    if (issues.length > 0) {
+      return;
+    }
 
     const name = createForm.name.trim();
     const category = createForm.category.trim();
     const dosageForm = createForm.dosageForm.trim();
     const slug = createForm.slug.trim();
     const priceNgn = Number.parseFloat(createForm.priceNgn);
-    const hasValidPrice = Number.isFinite(priceNgn) && priceNgn > 0;
-
-    if (!name || !category || !dosageForm || !hasValidPrice || createForm.branchIds.length === 0) {
-      setNotice({
-        tone: 'warning',
-        title: 'Incomplete product details',
-        description: 'Provide name, category, dosage form, positive price, and at least one branch before creating a product.',
-      });
-      return;
-    }
 
     if (!session) {
       return;
@@ -185,8 +276,9 @@ export function CatalogManagement() {
           ...initialCreateProductForm,
           branchIds: createdProduct.branchIds,
         });
+        setCreateIssues([]);
         setSelectedProductId(createdProduct.id);
-        setNotice({
+        setPageNotice({
           tone: 'success',
           title: 'Product created',
           description: `${createdProduct.name} is now available in ${createdProduct.branchIds.length} branch${createdProduct.branchIds.length === 1 ? '' : 'es'}.`,
@@ -194,7 +286,7 @@ export function CatalogManagement() {
       });
     } catch {
       startTransition(() => {
-        setNotice({
+        setPageNotice({
           tone: 'danger',
           title: 'Product creation failed',
           description: 'Could not create product. Check slug uniqueness and branch access, then try again.',
@@ -221,7 +313,7 @@ export function CatalogManagement() {
             return { ...p, branchIds: nextBranchIds };
           }),
         );
-        setNotice({
+        setPageNotice({
           tone: 'success',
           title: 'Availability updated',
           description: `Product is now ${!currentlyAvailable ? 'available' : 'unavailable'} at the selected branch.`,
@@ -229,7 +321,7 @@ export function CatalogManagement() {
       });
     } catch {
       startTransition(() =>
-        setNotice({ tone: 'danger', title: 'Update failed', description: 'Could not update branch availability. Check your access level.' }),
+        setPageNotice({ tone: 'danger', title: 'Update failed', description: 'Could not update branch availability. Check your access level.' }),
       );
     } finally {
       setTogglingKey(null);
@@ -261,88 +353,122 @@ export function CatalogManagement() {
         </>
       }
     >
-      <ResponsiveGrid>
-        <Panel title="Create product" description="Add new products to the catalog and assign their initial branch availability.">
-          <form onSubmit={(event) => void handleCreateProduct(event)} style={{ display: 'grid', gap: '0.75rem' }}>
-            <Field label="Product name">
-              <TextInput
-                value={createForm.name}
-                onChange={(event) => setCreateForm((current) => ({ ...current, name: event.target.value }))}
-                placeholder="Panadol Advance"
-              />
-            </Field>
-            <Field label="Slug (optional)">
-              <TextInput
-                value={createForm.slug}
-                onChange={(event) => setCreateForm((current) => ({ ...current, slug: event.target.value }))}
-                placeholder="panadol-advance"
-              />
-            </Field>
-            <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-              <Field label="Category">
-                <TextInput
-                  value={createForm.category}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, category: event.target.value }))}
-                  placeholder="Pain Management"
-                />
-              </Field>
-              <Field label="Dosage form">
-                <TextInput
-                  value={createForm.dosageForm}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, dosageForm: event.target.value }))}
-                  placeholder="tablet"
-                />
-              </Field>
-              <Field label="Price (NGN)">
-                <TextInput
-                  value={createForm.priceNgn}
-                  onChange={(event) => setCreateForm((current) => ({ ...current, priceNgn: event.target.value }))}
-                  placeholder="4500"
-                />
-              </Field>
-            </div>
+      <ResponsiveGrid minWidth="20rem">
+        {pageNotice ? (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <FeedbackNotice {...pageNotice} />
+          </div>
+        ) : null}
 
-            <div>
-              <span style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: '#475569', marginBottom: '0.5rem' }}>Prescription policy</span>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={createForm.requiresPrescription ? 'primary' : 'secondary'}
-                  onClick={() => setCreateForm((current) => ({ ...current, requiresPrescription: true }))}
-                >
-                  Rx required
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={!createForm.requiresPrescription ? 'primary' : 'secondary'}
-                  onClick={() => setCreateForm((current) => ({ ...current, requiresPrescription: false }))}
-                >
-                  Over-the-counter
-                </Button>
+        <Panel title="Create product" description="Add new products to the catalog and assign their initial branch availability.">
+          <form onSubmit={(event) => void handleCreateProduct(event)} style={formGridStyle}>
+            <ValidationSummary issues={createIssues} title="Review the product details before creating this catalog item." />
+
+            <div style={helperCardGridStyle}>
+              <div style={helperCardStyle}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#2563eb' }}>Pricing</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#0f172a' }}>
+                  {createForm.priceNgn.trim() ? `₦${Number.parseFloat(createForm.priceNgn || '0').toLocaleString()}` : 'Enter amount'}
+                </span>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Input is in naira; the API stores kobo.</span>
+              </div>
+              <div style={helperCardStyle}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#2563eb' }}>Coverage</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#0f172a' }}>{createForm.branchIds.length} branch{createForm.branchIds.length === 1 ? '' : 'es'} selected</span>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Choose where the product launches first.</span>
+              </div>
+              <div style={helperCardStyle}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#2563eb' }}>Prescription</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#0f172a' }}>{createForm.requiresPrescription ? 'Rx required' : 'Over-the-counter'}</span>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>This policy appears in the storefront and fulfillment flow.</span>
               </div>
             </div>
 
-            <div>
-              <span style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: '#475569', marginBottom: '0.5rem' }}>Initial branch availability</span>
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+            <div style={pairedFieldGridStyle}>
+              <Field label="Product name" hint="Use the customer-facing catalog name." error={getFieldIssue(createIssues, 'name')}>
+                <TextInput
+                  value={createForm.name}
+                  onChange={(event) => updateCreateForm('name', event.target.value)}
+                  placeholder="Panadol Advance"
+                  aria-invalid={Boolean(getFieldIssue(createIssues, 'name'))}
+                />
+              </Field>
+              <Field label="Slug (optional)" hint="Leave blank to auto-generate from the product name.">
+                <TextInput
+                  value={createForm.slug}
+                  onChange={(event) => updateCreateForm('slug', event.target.value)}
+                  placeholder="panadol-advance"
+                />
+              </Field>
+            </div>
+
+            <div style={pairedFieldGridStyle}>
+              <Field label="Category" hint="Use a shopper-facing grouping." error={getFieldIssue(createIssues, 'category')}>
+                <TextInput
+                  value={createForm.category}
+                  onChange={(event) => updateCreateForm('category', event.target.value)}
+                  placeholder="Pain Management"
+                  aria-invalid={Boolean(getFieldIssue(createIssues, 'category'))}
+                />
+              </Field>
+              <Field label="Dosage form" hint="Example: tablet, capsule, syrup." error={getFieldIssue(createIssues, 'dosageForm')}>
+                <TextInput
+                  value={createForm.dosageForm}
+                  onChange={(event) => updateCreateForm('dosageForm', event.target.value)}
+                  placeholder="tablet"
+                  aria-invalid={Boolean(getFieldIssue(createIssues, 'dosageForm'))}
+                />
+              </Field>
+              <Field label="Price (NGN)" hint="Whole naira amount shown on the storefront." error={getFieldIssue(createIssues, 'priceNgn')}>
+                <TextInput
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={createForm.priceNgn}
+                  onChange={(event) => updateCreateForm('priceNgn', event.target.value)}
+                  placeholder="4500"
+                  aria-invalid={Boolean(getFieldIssue(createIssues, 'priceNgn'))}
+                />
+              </Field>
+            </div>
+
+            <div style={sectionCardStyle}>
+              <div style={{ display: 'grid', gap: '0.2rem' }}>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#0f172a' }}>Prescription policy</span>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Set how the product should behave in catalog browsing and checkout.</span>
+              </div>
+              <div style={chipGroupStyle}>
+                <button
+                  type="button"
+                  style={createChipStyle(createForm.requiresPrescription, '#ea580c')}
+                  onClick={() => updateCreateForm('requiresPrescription', true)}
+                >
+                  Rx required
+                </button>
+                <button
+                  type="button"
+                  style={createChipStyle(!createForm.requiresPrescription, '#16a34a')}
+                  onClick={() => updateCreateForm('requiresPrescription', false)}
+                >
+                  Over-the-counter
+                </button>
+              </div>
+            </div>
+
+            <div style={sectionCardStyle}>
+              <div style={{ display: 'grid', gap: '0.2rem' }}>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#0f172a' }}>Initial branch availability</span>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Select the branches that should carry this product immediately.</span>
+              </div>
+              <div style={chipGroupStyle}>
                 {branches.map((branch) => {
                   const selected = createForm.branchIds.includes(branch.id);
                   return (
                     <button
                       key={branch.id}
                       type="button"
-                      style={{
-                        borderRadius: '999px',
-                        padding: '0.3rem 0.7rem',
-                        fontSize: '0.8125rem',
-                        fontWeight: 500,
-                        border: `1px solid ${selected ? '#16a34a' : '#e2e8f0'}`,
-                        background: selected ? '#16a34a' : '#fff',
-                        color: selected ? '#fff' : '#0f172a',
-                        cursor: 'pointer',
-                      }}
+                      style={createChipStyle(selected, '#0f766e')}
                       onClick={() => toggleCreateBranch(branch.id)}
                     >
                       {branch.name}
@@ -350,9 +476,13 @@ export function CatalogManagement() {
                   );
                 })}
               </div>
+              {getFieldIssue(createIssues, 'branchIds') ? (
+                <span style={{ color: '#b91c1c', fontSize: '0.8125rem', fontWeight: 500 }}>{getFieldIssue(createIssues, 'branchIds')}</span>
+              ) : null}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>New products stay selected so you can adjust branch availability immediately after creation.</span>
               <Button type="submit" disabled={isCreating}>
                 {isCreating ? 'Creating…' : 'Create product'}
               </Button>
@@ -360,59 +490,43 @@ export function CatalogManagement() {
           </form>
         </Panel>
 
-        {/* Filters */}
         <Panel title="Filters" description="Narrow the product list by name, category, or dosage form.">
-          {notice ? <FeedbackNotice {...notice} /> : null}
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            <Field label="Search products">
-              <TextInput
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Name, category, or dosage form…"
-              />
-            </Field>
-            <div>
-              <span style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: '#475569', marginBottom: '0.5rem' }}>Category</span>
-              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                <button
-                  style={{
-                    borderRadius: '999px',
-                    padding: '0.3rem 0.7rem',
-                    fontSize: '0.8125rem',
-                    fontWeight: 500,
-                    border: `1px solid ${categoryFilter === '' ? '#16a34a' : '#e2e8f0'}`,
-                    background: categoryFilter === '' ? '#16a34a' : '#fff',
-                    color: categoryFilter === '' ? '#fff' : '#0f172a',
-                    cursor: 'pointer',
-                  }}
-                  onClick={() => setCategoryFilter('')}
-                >
-                  All
-                </button>
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    style={{
-                      borderRadius: '999px',
-                      padding: '0.3rem 0.7rem',
-                      fontSize: '0.8125rem',
-                      fontWeight: 500,
-                      border: `1px solid ${categoryFilter === cat ? categoryColor(cat) : '#e2e8f0'}`,
-                      background: categoryFilter === cat ? categoryColor(cat) : '#fff',
-                      color: categoryFilter === cat ? '#fff' : '#0f172a',
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => setCategoryFilter(cat)}
-                  >
-                    {cat}
-                  </button>
-                ))}
+          <div style={formGridStyle}>
+            <div style={helperCardGridStyle}>
+              <div style={helperCardStyle}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#2563eb' }}>Visible</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#0f172a' }}>{filtered.length} product{filtered.length === 1 ? '' : 's'}</span>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Matching the current filter set.</span>
               </div>
+              <div style={helperCardStyle}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#2563eb' }}>Categories</span>
+                <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: '#0f172a' }}>{categories.length || 'No'} configured</span>
+                <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>Filter by live catalog categories.</span>
+              </div>
+            </div>
+
+            <div style={pairedFieldGridStyle}>
+              <Field label="Search products" hint="Search by name, category, or dosage form.">
+                <TextInput
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Name, category, or dosage form…"
+                />
+              </Field>
+              <Field label="Category" hint="Show all categories or narrow to one.">
+                <SelectInput
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  options={[
+                    { label: 'All categories', value: '' },
+                    ...categories.map((category) => ({ label: category, value: category })),
+                  ]}
+                />
+              </Field>
             </div>
           </div>
         </Panel>
 
-        {/* Availability editor for selected product */}
         {selectedProduct ? (
           <Panel
             title={selectedProduct.name}
@@ -420,7 +534,7 @@ export function CatalogManagement() {
             actions={
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 {selectedProduct.requiresPrescription ? <StatusBadge tone="warning">Rx required</StatusBadge> : null}
-                <Button size="sm" variant="ghost" onClick={() => setSelectedProductId(null)}>✕ Close</Button>
+                <Button size="sm" variant="ghost" onClick={() => setSelectedProductId(null)}>Close</Button>
               </div>
             }
           >
@@ -432,6 +546,7 @@ export function CatalogManagement() {
                 const available = selectedProduct.branchIds.includes(branch.id);
                 const key = `${selectedProduct.id}:${branch.id}`;
                 const isToggling = togglingKey === key;
+
                 return (
                   <div
                     key={branch.id}
@@ -439,15 +554,17 @@ export function CatalogManagement() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '0.65rem 0.875rem',
-                      borderRadius: '0.375rem',
+                      gap: '0.75rem',
+                      flexWrap: 'wrap',
+                      padding: '0.75rem 0.875rem',
+                      borderRadius: '0.75rem',
                       border: `1px solid ${available ? '#16a34a' : '#e2e8f0'}`,
-                      background: available ? '#dcfce7' : '#fff',
+                      background: available ? '#dcfce7' : '#ffffff',
                     }}
                   >
-                    <div>
+                    <div style={{ display: 'grid', gap: '0.2rem' }}>
                       <strong style={{ fontSize: '0.875rem', fontWeight: 600 }}>{branch.name}</strong>
-                      <span style={{ marginLeft: '0.5rem', color: '#64748b', fontSize: '0.8125rem' }}>
+                      <span style={{ color: '#64748b', fontSize: '0.8125rem' }}>
                         {branch.city}{branch.supportsDelivery ? ' · delivery' : ''}
                       </span>
                     </div>
@@ -457,7 +574,7 @@ export function CatalogManagement() {
                       disabled={isToggling}
                       onClick={() => void handleToggleBranchAvailability(selectedProduct.id, branch.id, available)}
                     >
-                      {isToggling ? '…' : available ? 'Remove' : 'Add'}
+                      {isToggling ? 'Updating…' : available ? 'Remove' : 'Add'}
                     </Button>
                   </div>
                 );
@@ -466,11 +583,10 @@ export function CatalogManagement() {
           </Panel>
         ) : null}
 
-        {/* Products table */}
         <div style={{ gridColumn: '1 / -1' }}>
           <Panel title="Product catalog" description={`Showing ${filtered.length} of ${products.length} products.`}>
             {isLoading ? (
-              <LoadingState title="Loading catalog" description="Fetching all products from the catalog API…" />
+              <LoadingState title="Loading catalog" description="Fetching all products from the catalog API..." />
             ) : (
               <DataTable
                 rows={filtered}
