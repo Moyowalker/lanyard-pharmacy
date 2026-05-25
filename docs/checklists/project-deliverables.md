@@ -44,6 +44,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Build prescription review and approval workflows for pharmacy staff.
 - [x] Build customer support views for customer history, communication context, and issue handling.
 - [x] Build audit and notification monitoring views for internal operations.
+- [x] Add admin catalog product creation flow so new products can be created and managed from the admin app.
 
 ## Backend Deliverables
 
@@ -70,6 +71,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Add inventory reservation, stock adjustment, and low-stock alert workflows.
 - [x] Add payment attempt creation, capture, failure handling, and reconciliation workflows.
 - [x] Add delivery assignment and delivery-status transition workflows.
+- [x] Add catalog product creation API workflow with branch availability assignment.
 
 ### Background Processing And Operations
 

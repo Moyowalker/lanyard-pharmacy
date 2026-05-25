@@ -13,6 +13,17 @@ export type CatalogProductRecord = {
   branchIds: string[];
 };
 
+export type CreateCatalogProductInput = {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  dosageForm: string;
+  price: number;
+  requiresPrescription: boolean;
+  branchIds: string[];
+};
+
 @Injectable()
 export class CatalogRepository {
   constructor(private readonly database: DatabaseService) {}
@@ -60,6 +71,30 @@ export class CatalogRepository {
     });
 
     return products.map((product) => this.mapProduct(product));
+  }
+
+  async create(input: CreateCatalogProductInput, client?: Prisma.TransactionClient): Promise<CatalogProductRecord> {
+    const product = await this.executor(client).product.create({
+      data: {
+        id: input.id,
+        name: input.name,
+        slug: input.slug,
+        category: input.category,
+        dosageForm: input.dosageForm,
+        price: input.price,
+        requiresPrescription: input.requiresPrescription,
+        branchProducts: {
+          create: input.branchIds.map((branchId) => ({
+            branchId,
+          })),
+        },
+      },
+      include: {
+        branchProducts: true,
+      },
+    });
+
+    return this.mapProduct(product);
   }
 
   async addBranchProduct(productId: string, branchId: string): Promise<void> {

@@ -44,6 +44,16 @@ export type CatalogProduct = {
   branchIds: string[];
 };
 
+export type CreateCatalogProductRequest = {
+  name: string;
+  slug?: string;
+  category: string;
+  dosageForm: string;
+  price: number;
+  requiresPrescription?: boolean;
+  branchIds: string[];
+};
+
 export type CartLineInput = {
   productId: string;
   quantity: number;
@@ -368,6 +378,8 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     adjustInventoryBatch: (batchId: string, payload: AdjustInventoryBatchRequest) =>
       request<InventoryBatchRecord>(`/api/v1/inventory/batches/${batchId}/adjust`, { method: 'PATCH', body: payload }),
     // Admin catalog management
+    createCatalogProduct: (payload: CreateCatalogProductRequest) =>
+      request<CatalogProduct>('/api/v1/catalog/products', { method: 'POST', body: payload }),
     setBranchProductAvailability: (productId: string, branchId: string, available: boolean) =>
       available
         ? request<void>(`/api/v1/catalog/products/${productId}/branches/${branchId}`, { method: 'PUT' })

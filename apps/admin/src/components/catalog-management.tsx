@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { BranchSummary, CatalogProduct } from '@lanyard/api-contracts/client';
 import {
   Button,
@@ -45,6 +45,26 @@ function categoryColor(cat: string) {
   return categoryColors[cat] ?? '#94a3b8';
 }
 
+type CreateProductForm = {
+  name: string;
+  slug: string;
+  category: string;
+  dosageForm: string;
+  priceNgn: string;
+  requiresPrescription: boolean;
+  branchIds: string[];
+};
+
+const initialCreateProductForm: CreateProductForm = {
+  name: '',
+  slug: '',
+  category: '',
+  dosageForm: '',
+  priceNgn: '',
+  requiresPrescription: false,
+  branchIds: [],
+};
+
 export function CatalogManagement() {
   const [session] = useState(() => readAdminSession());
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -53,6 +73,8 @@ export function CatalogManagement() {
   const [notice, setNotice] = useState<FormFeedback | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [createForm, setCreateForm] = useState<CreateProductForm>(initialCreateProductForm);
+  const [isCreating, setIsCreating] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
 
@@ -103,6 +125,84 @@ export function CatalogManagement() {
   }, [products, searchTerm, categoryFilter]);
 
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null;
+
+  function toggleCreateBranch(branchId: string) {
+    setCreateForm((current) => {
+      if (current.branchIds.includes(branchId)) {
+        return {
+          ...current,
+          branchIds: current.branchIds.filter((id) => id !== branchId),
+        };
+      }
+
+      return {
+        ...current,
+        branchIds: [...current.branchIds, branchId],
+      };
+    });
+  }
+
+  async function handleCreateProduct(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = createForm.name.trim();
+    const category = createForm.category.trim();
+    const dosageForm = createForm.dosageForm.trim();
+    const slug = createForm.slug.trim();
+    const priceNgn = Number.parseFloat(createForm.priceNgn);
+    const hasValidPrice = Number.isFinite(priceNgn) && priceNgn > 0;
+
+    if (!name || !category || !dosageForm || !hasValidPrice || createForm.branchIds.length === 0) {
+      setNotice({
+        tone: 'warning',
+        title: 'Incomplete product details',
+        description: 'Provide name, category, dosage form, positive price, and at least one branch before creating a product.',
+      });
+      return;
+    }
+
+    if (!session) {
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      const createdProduct = await apiClient.createCatalogProduct({
+        name,
+        slug: slug || undefined,
+        category,
+        dosageForm,
+        price: Math.round(priceNgn * 100),
+        requiresPrescription: createForm.requiresPrescription,
+        branchIds: createForm.branchIds,
+      });
+
+      startTransition(() => {
+        setProducts((current) => [...current, createdProduct].sort((left, right) => left.name.localeCompare(right.name)));
+        setCreateForm({
+          ...initialCreateProductForm,
+          branchIds: createdProduct.branchIds,
+        });
+        setSelectedProductId(createdProduct.id);
+        setNotice({
+          tone: 'success',
+          title: 'Product created',
+          description: `${createdProduct.name} is now available in ${createdProduct.branchIds.length} branch${createdProduct.branchIds.length === 1 ? '' : 'es'}.`,
+        });
+      });
+    } catch {
+      startTransition(() => {
+        setNotice({
+          tone: 'danger',
+          title: 'Product creation failed',
+          description: 'Could not create product. Check slug uniqueness and branch access, then try again.',
+        });
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
   async function handleToggleBranchAvailability(productId: string, branchId: string, currentlyAvailable: boolean) {
     if (!session) return;
@@ -161,6 +261,104 @@ export function CatalogManagement() {
       }
     >
       <ResponsiveGrid>
+        <Panel title="Create product" description="Add new products to the catalog and assign their initial branch availability.">
+          <form onSubmit={(event) => void handleCreateProduct(event)} style={{ display: 'grid', gap: '0.75rem' }}>
+            <Field label="Product name">
+              <TextInput
+                value={createForm.name}
+                onChange={(event) => setCreateForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Panadol Advance"
+              />
+            </Field>
+            <Field label="Slug (optional)">
+              <TextInput
+                value={createForm.slug}
+                onChange={(event) => setCreateForm((current) => ({ ...current, slug: event.target.value }))}
+                placeholder="panadol-advance"
+              />
+            </Field>
+            <div style={{ display: 'grid', gap: '0.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+              <Field label="Category">
+                <TextInput
+                  value={createForm.category}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, category: event.target.value }))}
+                  placeholder="Pain Management"
+                />
+              </Field>
+              <Field label="Dosage form">
+                <TextInput
+                  value={createForm.dosageForm}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, dosageForm: event.target.value }))}
+                  placeholder="tablet"
+                />
+              </Field>
+              <Field label="Price (NGN)">
+                <TextInput
+                  value={createForm.priceNgn}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, priceNgn: event.target.value }))}
+                  placeholder="4500"
+                />
+              </Field>
+            </div>
+
+            <div>
+              <span style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: '#475569', marginBottom: '0.5rem' }}>Prescription policy</span>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={createForm.requiresPrescription ? 'primary' : 'secondary'}
+                  onClick={() => setCreateForm((current) => ({ ...current, requiresPrescription: true }))}
+                >
+                  Rx required
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={!createForm.requiresPrescription ? 'primary' : 'secondary'}
+                  onClick={() => setCreateForm((current) => ({ ...current, requiresPrescription: false }))}
+                >
+                  Over-the-counter
+                </Button>
+              </div>
+            </div>
+
+            <div>
+              <span style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 500, color: '#475569', marginBottom: '0.5rem' }}>Initial branch availability</span>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {branches.map((branch) => {
+                  const selected = createForm.branchIds.includes(branch.id);
+                  return (
+                    <button
+                      key={branch.id}
+                      type="button"
+                      style={{
+                        borderRadius: '999px',
+                        padding: '0.3rem 0.7rem',
+                        fontSize: '0.8125rem',
+                        fontWeight: 500,
+                        border: `1px solid ${selected ? '#16a34a' : '#e2e8f0'}`,
+                        background: selected ? '#16a34a' : '#fff',
+                        color: selected ? '#fff' : '#0f172a',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => toggleCreateBranch(branch.id)}
+                    >
+                      {branch.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button type="submit" disabled={isCreating}>
+                {isCreating ? 'Creating…' : 'Create product'}
+              </Button>
+            </div>
+          </form>
+        </Panel>
+
         {/* Filters */}
         <Panel title="Filters" description="Narrow the product list by name, category, or dosage form.">
           {notice ? <FeedbackNotice {...notice} /> : null}
