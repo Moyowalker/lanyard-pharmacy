@@ -49,6 +49,7 @@ This document is the delivery control checklist for the Lanyard Pharmacy platfor
 - [x] Build admin user management screens for creating, updating, and activating or deactivating operator accounts.
 - [x] Harden deployed web and admin API-base resolution so Render frontends continue calling the live API when build-time frontend env values drift or are missing.
 - [x] Refresh admin data-entry form layouts for catalog and user management so controls align consistently across desktop and mobile.
+- [x] Correct admin user-management page alignment so create-user and directory panels render full-width without dead grid columns.
 
 ## Backend Deliverables
 

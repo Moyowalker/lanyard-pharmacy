@@ -99,6 +99,14 @@ const sectionCardStyle = {
   background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
 } as const;
 
+const fullGridRowStyle = {
+  gridColumn: '1 / -1',
+} as const;
+
+const formColumnStyle = {
+  maxWidth: '56rem',
+} as const;
+
 const chipGroupStyle = {
   display: 'flex',
   gap: '0.45rem',
@@ -364,13 +372,15 @@ export function UsersManagement() {
     >
       <ResponsiveGrid minWidth="20rem">
         {pageNotice ? (
-          <div style={{ gridColumn: '1 / -1' }}>
+          <div style={fullGridRowStyle}>
             <FeedbackNotice {...pageNotice} />
           </div>
         ) : null}
 
-        <Panel title="Create user" description="Provision a new operator account with role and branch scope.">
-          <form onSubmit={(event) => void handleCreateUser(event)} style={formGridStyle}>
+        <div style={fullGridRowStyle}>
+          <Panel title="Create user" description="Provision a new operator account with role and branch scope.">
+            <div style={formColumnStyle}>
+              <form onSubmit={(event) => void handleCreateUser(event)} style={formGridStyle}>
             <ValidationSummary issues={createIssues} title="Review the operator details before creating the account." />
 
             <div style={helperCardGridStyle}>
@@ -488,10 +498,12 @@ export function UsersManagement() {
               <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>New users are created as active accounts and can be managed from the directory below.</span>
               <Button type="submit" disabled={isCreating}>{isCreating ? 'Creating…' : 'Create user'}</Button>
             </div>
-          </form>
-        </Panel>
+              </form>
+            </div>
+          </Panel>
+        </div>
 
-        <div style={{ gridColumn: '1 / -1' }}>
+        <div style={fullGridRowStyle}>
           <Panel title="Operator directory" description="Activate or deactivate accounts used by internal teams.">
             {isLoading ? (
               <LoadingState title="Loading users" description="Fetching platform user accounts from the API..." />
