@@ -85,6 +85,25 @@ const helperCardStyle = {
   background: 'linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%)',
 } as const;
 
+const fullGridRowStyle = {
+  gridColumn: '1 / -1',
+} as const;
+
+const pageContentWrapStyle = {
+  width: '100%',
+  maxWidth: '76rem',
+  margin: '0 auto',
+} as const;
+
+const topPanelGridStyle = {
+  display: 'grid',
+  gap: '1rem',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(20rem, 1fr))',
+  alignItems: 'start',
+  maxWidth: '68rem',
+  margin: '0 auto',
+} as const;
+
 const chipGroupStyle = {
   display: 'flex',
   gap: '0.45rem',
@@ -353,14 +372,17 @@ export function CatalogManagement() {
         </>
       }
     >
-      <ResponsiveGrid minWidth="20rem">
+      <div style={pageContentWrapStyle}>
+        <ResponsiveGrid minWidth="20rem">
         {pageNotice ? (
-          <div style={{ gridColumn: '1 / -1' }}>
+          <div style={fullGridRowStyle}>
             <FeedbackNotice {...pageNotice} />
           </div>
         ) : null}
 
-        <Panel title="Create product" description="Add new products to the catalog and assign their initial branch availability.">
+        <div style={fullGridRowStyle}>
+          <div style={topPanelGridStyle}>
+            <Panel title="Create product" description="Add new products to the catalog and assign their initial branch availability.">
           <form onSubmit={(event) => void handleCreateProduct(event)} style={formGridStyle}>
             <ValidationSummary issues={createIssues} title="Review the product details before creating this catalog item." />
 
@@ -488,9 +510,9 @@ export function CatalogManagement() {
               </Button>
             </div>
           </form>
-        </Panel>
+            </Panel>
 
-        <Panel title="Filters" description="Narrow the product list by name, category, or dosage form.">
+            <Panel title="Filters" description="Narrow the product list by name, category, or dosage form.">
           <div style={formGridStyle}>
             <div style={helperCardGridStyle}>
               <div style={helperCardStyle}>
@@ -525,10 +547,13 @@ export function CatalogManagement() {
               </Field>
             </div>
           </div>
-        </Panel>
+            </Panel>
+          </div>
+        </div>
 
         {selectedProduct ? (
-          <Panel
+          <div style={fullGridRowStyle}>
+            <Panel
             title={selectedProduct.name}
             description={`${selectedProduct.category} · ${selectedProduct.dosageForm} · ₦${(selectedProduct.price / 100).toLocaleString()}`}
             actions={
@@ -580,10 +605,11 @@ export function CatalogManagement() {
                 );
               })}
             </div>
-          </Panel>
+            </Panel>
+          </div>
         ) : null}
 
-        <div style={{ gridColumn: '1 / -1' }}>
+        <div style={fullGridRowStyle}>
           <Panel title="Product catalog" description={`Showing ${filtered.length} of ${products.length} products.`}>
             {isLoading ? (
               <LoadingState title="Loading catalog" description="Fetching all products from the catalog API..." />
@@ -669,7 +695,8 @@ export function CatalogManagement() {
             )}
           </Panel>
         </div>
-      </ResponsiveGrid>
+        </ResponsiveGrid>
+      </div>
     </DashboardShell>
   );
 }

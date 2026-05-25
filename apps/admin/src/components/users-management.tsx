@@ -103,8 +103,16 @@ const fullGridRowStyle = {
   gridColumn: '1 / -1',
 } as const;
 
+const pageContentWrapStyle = {
+  width: '100%',
+  maxWidth: '76rem',
+  margin: '0 auto',
+} as const;
+
 const formColumnStyle = {
+  width: '100%',
   maxWidth: '56rem',
+  margin: '0 auto',
 } as const;
 
 const chipGroupStyle = {
@@ -370,7 +378,8 @@ export function UsersManagement() {
         </>
       }
     >
-      <ResponsiveGrid minWidth="20rem">
+      <div style={pageContentWrapStyle}>
+        <ResponsiveGrid minWidth="20rem">
         {pageNotice ? (
           <div style={fullGridRowStyle}>
             <FeedbackNotice {...pageNotice} />
@@ -569,7 +578,8 @@ export function UsersManagement() {
             )}
           </Panel>
         </div>
-      </ResponsiveGrid>
+        </ResponsiveGrid>
+      </div>
     </DashboardShell>
   );
 }
